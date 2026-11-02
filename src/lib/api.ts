@@ -1,91 +1,6 @@
 import { supabase } from '@/db/supabase';
-import { ALIBABA_VERIFIED_SUPPLIERS, getAlibabaSupplierBySlug } from '@/data/alibabaVerifiedSuppliers';
-import { EXPANDED_GLOBAL_PRODUCTS, type GlobalCatalogProduct } from '@/data/expandedGlobalProducts';
-import { CURATED_INDUSTRIAL_PRODUCTS, type CuratedProduct } from '@/data/curatedIndustrialProducts';
-import {
-  MOCKUP_VERIFIED_COMPANIES,
-  MOCKUP_SUPPLIER_PRODUCTS,
-  MOCKUP_SUPPLIER_CERTS,
-  MOCKUP_SUPPLIER_REVIEWS,
-  findMockupCompany,
-} from '@/data/mockupVerifiedSuppliers';
+import { INCLUDE_TEMPLATE_SEED_DATA, SEED_OWNER_ID, SEEDED_RFQ_TITLE_LIKE, isSeededCompany, isSeededRequirement } from '@/lib/seedData';
 import type { Category, Company, CompanyCertification, CompanyReview, Product, Requirement, Quotation, Conversation, Message, Notification, Profile, OrderRow, SupplierInquiry, InquiryReply } from '@/types/types';
-
-function mapGlobalToProduct(gp: GlobalCatalogProduct): Product {
-  return {
-    id: gp.id,
-    company_id: gp.company_id,
-    category_id: gp.category_id,
-    name: gp.name,
-    slug: gp.slug,
-    description: gp.description,
-    specifications: gp.specifications,
-    moq: gp.moq,
-    moq_unit: gp.moq_unit,
-    price_min: gp.price_min,
-    price_max: gp.price_max,
-    price_currency: gp.price_currency || 'USD',
-    images: gp.images && gp.images.length > 0 ? gp.images : ['https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=800&q=80'],
-    is_active: gp.is_active,
-    is_featured: gp.is_featured,
-    view_count: gp.view_count,
-    is_sponsored: gp.is_sponsored,
-    is_promoted: gp.is_promoted,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    companies: {
-      id: gp.company_id,
-      company_name: gp.company_name,
-      slug: gp.company_name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-      country: gp.country,
-      city: gp.city,
-      verification_status: 'verified',
-      rating_avg: 4.8,
-    } as any,
-    categories: {
-      id: gp.category_id,
-      name: gp.category_name,
-      slug: gp.category_slug,
-    } as any,
-  } as unknown as Product;
-}
-
-function mapCuratedToProduct(cp: CuratedProduct): Product {
-  return {
-    id: cp.id,
-    company_id: cp.companyId,
-    category_id: cp.categorySlug,
-    name: cp.name,
-    slug: cp.slug,
-    description: cp.subtitle,
-    specifications: `Manufacturer: ${cp.supplierName} | Country: ${cp.country} | MOQ: ${cp.moq} | Rating: ${cp.rating}★ | Badge: ${cp.badgeLabel}`,
-    moq: parseInt(cp.moq.replace(/[^0-9]/g, '')) || 10,
-    moq_unit: cp.moq.replace(/^[0-9\s+]+/, '') || 'Units',
-    price_min: cp.usdMin,
-    price_max: cp.usdMax,
-    price_currency: 'USD',
-    images: [cp.img],
-    is_active: true,
-    is_featured: true,
-    view_count: 320,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    companies: {
-      id: cp.companyId,
-      company_name: cp.supplierName,
-      slug: cp.companyId,
-      country: cp.country,
-      city: cp.country === 'India' ? 'Mumbai' : 'Industrial Hub',
-      verification_status: 'verified',
-      rating_avg: cp.rating,
-    } as any,
-    categories: {
-      id: cp.categorySlug,
-      name: cp.categoryName,
-      slug: cp.categorySlug,
-    } as any,
-  } as unknown as Product;
-}
 
 const PAGE_SIZE = 12;
 
@@ -267,7 +182,6 @@ export async function getCompanies(options?: {
   cursor?: string;
   limit?: number;
 }): Promise<Company[]> {
-  let dbCompanies: Company[] = [];
   try {
     let query = supabase
       .from('companies')
@@ -280,106 +194,35 @@ export async function getCompanies(options?: {
     if (options?.verified) query = query.eq('verification_status', 'verified');
     if (options?.featured) query = query.eq('is_featured', true);
     if (options?.cursor) query = query.lt('created_at', options.cursor);
+    // The template's demonstration companies are never presented as real suppliers.
+    if (!INCLUDE_TEMPLATE_SEED_DATA) query = query.neq('owner_id', SEED_OWNER_ID);
 
     const { data } = await query;
-    if (Array.isArray(data)) {
-      dbCompanies = data;
-    }
+    return Array.isArray(data) ? data.filter((company) => !isSeededCompany(company)) : [];
   } catch {
-    dbCompanies = [];
+    return [];
   }
-
-  const searchQ = options?.search?.trim().toLowerCase();
-  const filteredMockup = MOCKUP_VERIFIED_COMPANIES.filter((s) => {
-    if (options?.verified && !s.is_verified) return false;
-    if (options?.featured && !s.is_featured) return false;
-    if (options?.country && options.country !== 'all' && s.country.toLowerCase() !== options.country.toLowerCase()) {
-      return false;
-    }
-    if (searchQ) {
-      const matchName = s.company_name.toLowerCase().includes(searchQ);
-      const matchCity = s.city?.toLowerCase().includes(searchQ);
-      const matchCountry = s.country.toLowerCase().includes(searchQ);
-      const matchType = s.business_type?.toLowerCase().includes(searchQ);
-      const matchProducts = s.key_products?.some((p) => p.toLowerCase().includes(searchQ));
-      if (!matchName && !matchCity && !matchCountry && !matchType && !matchProducts) {
-        return false;
-      }
-    }
-    return true;
-  });
-
-  // Filter Alibaba Verified Suppliers dataset
-  const filteredAlibaba = ALIBABA_VERIFIED_SUPPLIERS.filter((s) => {
-    if (options?.verified && !s.is_verified) return false;
-    if (options?.featured && !s.is_featured) return false;
-    if (options?.country && options.country !== 'all' && s.country.toLowerCase() !== options.country.toLowerCase()) {
-      return false;
-    }
-    if (searchQ) {
-      const matchName = s.company_name.toLowerCase().includes(searchQ);
-      const matchCity = s.city?.toLowerCase().includes(searchQ);
-      const matchCountry = s.country.toLowerCase().includes(searchQ);
-      const matchIndustry = s.industry.toLowerCase().includes(searchQ);
-      const matchSub = s.subcategory.toLowerCase().includes(searchQ);
-      const matchProducts = s.key_products?.some((p) => p.toLowerCase().includes(searchQ));
-      if (!matchName && !matchCity && !matchCountry && !matchIndustry && !matchSub && !matchProducts) {
-        return false;
-      }
-    }
-    return true;
-  });
-
-  const merged = [...filteredMockup, ...dbCompanies, ...filteredAlibaba];
-  const maxLimit = options?.limit ?? 1500;
-  return merged.slice(0, maxLimit);
 }
 
 export async function getCompanyBySlug(slug: string): Promise<Company | null> {
   if (!slug) return null;
   const cleanSlug = slug.trim().toLowerCase();
 
-  // 1. Check Mockup / Showcase Verified Registry
-  const mockupCompany = findMockupCompany(cleanSlug);
-  if (mockupCompany) return mockupCompany;
-
-  // 2. Check Supabase by exact slug
+  // Only companies that exist in the database. Nothing is synthesised, and the template's demo companies are not served.
   try {
-    const { data } = await supabase
-      .from('companies')
-      .select('*')
-      .eq('slug', cleanSlug)
-      .maybeSingle();
-    if (data) return data;
+    const { data } = await supabase.from('companies').select('*').eq('slug', cleanSlug).maybeSingle();
+    if (data) return isSeededCompany(data) ? null : data;
   } catch {
     // ignore
   }
 
-  // 3. Check Supabase by ID
   try {
-    const { data: byId } = await supabase
-      .from('companies')
-      .select('*')
-      .eq('id', cleanSlug)
-      .maybeSingle();
-    if (byId) return byId;
+    const { data: byId } = await supabase.from('companies').select('*').eq('id', cleanSlug).maybeSingle();
+    if (byId) return isSeededCompany(byId) ? null : byId;
   } catch {
     // ignore
   }
 
-  // 4. Check Alibaba dataset by exact slug
-  const alibabaSupplier = getAlibabaSupplierBySlug(cleanSlug);
-  if (alibabaSupplier) return alibabaSupplier;
-
-  // 5. Check Alibaba dataset by ID or name matching
-  const matchAlibaba = ALIBABA_VERIFIED_SUPPLIERS.find(
-    s => s.id.toLowerCase() === cleanSlug ||
-         s.slug.toLowerCase() === cleanSlug ||
-         s.company_name.toLowerCase().replace(/[^a-z0-9]/g, '-') === cleanSlug
-  );
-  if (matchAlibaba) return matchAlibaba;
-
-  // Not found in database or catalog — return null (never synthesize fake companies with fake GST/metrics)
   return null;
 }
 
@@ -419,7 +262,8 @@ export async function getProducts(options?: {
 }): Promise<Product[]> {
   let query = supabase
     .from('products')
-    .select('*, companies!company_id(id,company_name,slug,verification_status,city,country,logo_url), categories!category_id(id,name,slug)')
+    // !inner so products of the template's demo companies can be left out below
+    .select('*, companies!company_id!inner(id,owner_id,company_name,slug,verification_status,city,country,logo_url), categories!category_id(id,name,slug)')
     .eq('is_active', true)
     .order('created_at', { ascending: false })
     .limit(options?.limit ?? 150);
@@ -429,150 +273,49 @@ export async function getProducts(options?: {
   if (options?.search) query = query.ilike('name', `%${options.search}%`);
   if (options?.featured) query = query.eq('is_featured', true);
   if (options?.cursor) query = query.lt('created_at', options.cursor);
+  if (!INCLUDE_TEMPLATE_SEED_DATA) query = query.neq('companies.owner_id', SEED_OWNER_ID);
 
   const { data } = await query;
-  let combined: Product[] = Array.isArray(data) ? [...data] : [];
+  const rows: Product[] = Array.isArray(data) ? [...data] : [];
 
-  // Filter and merge expanded global catalog items
-  const searchLower = options?.search ? options.search.trim().toLowerCase() : '';
   const countryFilter = options?.country && options.country !== 'all' ? options.country.toLowerCase() : '';
-
-  const matchingGlobal = EXPANDED_GLOBAL_PRODUCTS.filter(p => {
-    if (options?.categoryId && p.category_id !== options.categoryId && p.category_slug !== options.categoryId) return false;
-    if (options?.categorySlug && p.category_slug !== options.categorySlug) return false;
-    if (options?.companyId && p.company_id !== options.companyId) return false;
-    if (countryFilter && p.country.toLowerCase() !== countryFilter) return false;
-    if (searchLower) {
-      const matchName = p.name.toLowerCase().includes(searchLower);
-      const matchCat = p.category_name.toLowerCase().includes(searchLower);
-      const matchDesc = p.description.toLowerCase().includes(searchLower);
-      if (!matchName && !matchCat && !matchDesc) return false;
-    }
-    return true;
-  });
-
-  const seenIds = new Set(combined.map(p => p.id));
-  const seenSlugs = new Set(combined.map(p => p.slug));
-
-  for (const gp of matchingGlobal) {
-    if (!seenIds.has(gp.id) && !seenSlugs.has(gp.slug)) {
-      seenIds.add(gp.id);
-      seenSlugs.add(gp.slug);
-      combined.push(mapGlobalToProduct(gp));
-    }
-  }
-
-  // Only include products from MOCKUP_SUPPLIER_PRODUCTS for public catalog exploration when no specific companyId filter is active
-  if (!options?.companyId) {
-    for (const mList of Object.values(MOCKUP_SUPPLIER_PRODUCTS)) {
-      for (const mp of mList) {
-        if (!seenIds.has(mp.id) && !seenSlugs.has(mp.slug)) {
-          seenIds.add(mp.id);
-          seenSlugs.add(mp.slug);
-          combined.push(mp);
-        }
-      }
-    }
-  }
-
-  // Only include curated products for general public discovery, never when querying a specific supplier's company
-  if (!options?.companyId) {
-    for (const cp of CURATED_INDUSTRIAL_PRODUCTS) {
-      if (options?.categoryId && cp.categorySlug !== options.categoryId) continue;
-      if (countryFilter && cp.country.toLowerCase() !== countryFilter) continue;
-      if (searchLower && !cp.name.toLowerCase().includes(searchLower)) continue;
-      if (!seenIds.has(cp.id) && !seenSlugs.has(cp.slug)) {
-        seenIds.add(cp.id);
-        seenSlugs.add(cp.slug);
-        combined.push(mapCuratedToProduct(cp));
-      }
-    }
-  }
-
-  return combined;
+  if (!countryFilter) return rows;
+  return rows.filter((product) => product.companies?.country?.toLowerCase() === countryFilter);
 }
 
 export async function getProductBySlug(slug: string): Promise<Product | null> {
   if (!slug) return null;
+  const select = '*, companies!company_id(*), categories!category_id(*)';
 
-  // 1. Check MOCKUP_SUPPLIER_PRODUCTS
-  for (const list of Object.values(MOCKUP_SUPPLIER_PRODUCTS)) {
-    const found = list.find(p => p.slug === slug || p.id === slug);
-    if (found) return found;
+  // Only products that exist in the database. An unknown slug is "not found", never another product.
+  const { data } = await supabase.from('products').select(select).eq('slug', slug).maybeSingle();
+  let product = data;
+
+  if (!product && slug.includes('-') && slug.length >= 32) {
+    const { data: byId } = await supabase.from('products').select(select).eq('id', slug).maybeSingle();
+    product = byId;
   }
 
-  // 2. Check Supabase by exact slug
-  const { data } = await supabase
-    .from('products')
-    .select('*, companies!company_id(*), categories!category_id(*)')
-    .eq('slug', slug)
-    .maybeSingle();
-
-  if (data) return data;
-
-  // 2. Check Supabase by ID if slug format looks like UUID
-  if (slug.includes('-') && slug.length >= 32) {
-    const { data: byId } = await supabase
-      .from('products')
-      .select('*, companies!company_id(*), categories!category_id(*)')
-      .eq('id', slug)
-      .maybeSingle();
-    if (byId) return byId;
-  }
-
-  // 3. Check EXPANDED_GLOBAL_PRODUCTS by slug or id
-  const fromGlobal = EXPANDED_GLOBAL_PRODUCTS.find(p => p.slug === slug || p.id === slug);
-  if (fromGlobal) {
-    return mapGlobalToProduct(fromGlobal);
-  }
-
-  // 4. Check CURATED_INDUSTRIAL_PRODUCTS by slug or id
-  const fromCurated = CURATED_INDUSTRIAL_PRODUCTS.find(p => p.slug === slug || p.id === slug);
-  if (fromCurated) {
-    return mapCuratedToProduct(fromCurated);
-  }
-
-  // 5. Relaxed / fuzzy slug match in EXPANDED_GLOBAL_PRODUCTS
-  const normalized = slug.toLowerCase();
-  const fuzzyGlobal = EXPANDED_GLOBAL_PRODUCTS.find(p => 
-    p.slug.toLowerCase().includes(normalized) || 
-    normalized.includes(p.slug.toLowerCase()) ||
-    p.name.toLowerCase().includes(normalized)
-  );
-  if (fuzzyGlobal) {
-    return mapGlobalToProduct(fuzzyGlobal);
-  }
-
-  // 6. Return first matching global product as safety fallback so product page never crashes with 404
-  if (EXPANDED_GLOBAL_PRODUCTS.length > 0) {
-    return mapGlobalToProduct(EXPANDED_GLOBAL_PRODUCTS[0]);
-  }
-
-  return null;
+  if (!product) return null;
+  // Products of the template's demo companies are not served.
+  if (product.companies && isSeededCompany(product.companies)) return null;
+  return product;
 }
 
 /** Returns up to 8 products from the same category, excluding the current product */
 export async function getSimilarProducts(categoryId: string | null, excludeId: string): Promise<Product[]> {
   let query = supabase
     .from('products')
-    .select('*, companies!company_id(id,company_name,slug,verification_status,city,country,logo_url), categories!category_id(id,name,slug)')
+    .select('*, companies!company_id!inner(id,owner_id,company_name,slug,verification_status,city,country,logo_url), categories!category_id(id,name,slug)')
     .eq('is_active', true)
     .neq('id', excludeId)
     .limit(8);
 
   if (categoryId) query = query.eq('category_id', categoryId);
+  if (!INCLUDE_TEMPLATE_SEED_DATA) query = query.neq('companies.owner_id', SEED_OWNER_ID);
 
   const { data } = await query.order('view_count', { ascending: false });
-  let result: Product[] = Array.isArray(data) ? [...data] : [];
-
-  if (result.length < 6 && categoryId) {
-    const globals = EXPANDED_GLOBAL_PRODUCTS.filter(
-      p => (p.category_id === categoryId || p.category_slug === categoryId) && p.id !== excludeId
-    ).slice(0, 8 - result.length);
-    result.push(...globals.map(mapGlobalToProduct));
-  }
-
-  return result;
+  return Array.isArray(data) ? [...data] : [];
 }
 
 export async function createProduct(payload: Partial<Product>): Promise<{ error: string | null }> {
@@ -641,10 +384,13 @@ export async function getMarketplaceProducts(
   let query = supabase
     .from('products')
     .select(
-      '*, companies!company_id(id,owner_id,company_name,slug,verification_status,city,country,logo_url,rating_avg,review_count), categories!category_id(id,name,slug)',
+      '*, companies!company_id!inner(id,owner_id,company_name,slug,verification_status,city,country,logo_url,rating_avg,review_count), categories!category_id(id,name,slug)',
       { count: 'exact' }
     )
     .eq('is_active', true);
+
+  // The template's demo companies are never presented as real suppliers.
+  if (!INCLUDE_TEMPLATE_SEED_DATA) query = query.neq('companies.owner_id', SEED_OWNER_ID);
 
   if (options.categoryId && options.categoryId !== 'all') {
     query = query.eq('category_id', options.categoryId);
@@ -777,6 +523,9 @@ export async function getRequirements(options?: {
   // For live-polling: fetch only rows newer than last known timestamp
   if (options?.newerThan) query = query.gt('created_at', options.newerThan);
 
+  // The template's generated "Lot #" RFQs are demonstration rows, not buyer demand.
+  if (!INCLUDE_TEMPLATE_SEED_DATA && !options?.buyerId) query = query.not('title', 'like', SEEDED_RFQ_TITLE_LIKE);
+
   const { data } = await query;
   if (!Array.isArray(data)) return [];
 
@@ -824,6 +573,85 @@ export async function getRequirements(options?: {
   return uniqueItems;
 }
 
+export interface MarketplaceCounts {
+  verifiedSuppliers: number | null;
+  supplierCountries: number | null;
+  openRequirements: number | null;
+  liveAuctions: number | null;
+}
+
+/** Headline figures, each counted in the database. A figure that cannot be counted is null, never a guess. */
+export async function getMarketplaceCounts(): Promise<MarketplaceCounts> {
+  const nowIso = new Date().toISOString();
+  const SCAN_LIMIT = 1000;
+  let verified = supabase.from('companies').select('id', { count: 'exact', head: true }).eq('verification_status', 'verified');
+  let countries = supabase.from('companies').select('country').eq('verification_status', 'verified').limit(SCAN_LIMIT);
+  let requirements = supabase.from('requirements').select('id', { count: 'exact', head: true }).eq('status', 'active');
+  if (!INCLUDE_TEMPLATE_SEED_DATA) {
+    verified = verified.neq('owner_id', SEED_OWNER_ID);
+    countries = countries.neq('owner_id', SEED_OWNER_ID);
+    requirements = requirements.not('title', 'like', SEEDED_RFQ_TITLE_LIKE);
+  }
+  const auctions = supabase
+    .from('auctions')
+    .select('id', { count: 'exact', head: true })
+    .in('status', ['live', 'closing_soon'])
+    .gt('end_time', nowIso);
+
+  const [v, c, r, a] = await Promise.all([verified, countries, requirements, auctions]);
+  const countryRows = !c.error && Array.isArray(c.data) && c.data.length < SCAN_LIMIT ? (c.data as Array<{ country: string | null }>) : null;
+  return {
+    verifiedSuppliers: v.error ? null : (v.count ?? 0),
+    supplierCountries: countryRows
+      ? new Set(countryRows.map((row) => (row.country || '').trim().toLowerCase()).filter(Boolean)).size
+      : null,
+    openRequirements: r.error ? null : (r.count ?? 0),
+    liveAuctions: a.error ? null : (a.count ?? 0),
+  };
+}
+
+/**
+ * One page of open requirements, straight from the database, with the real total.
+ * The template's generated "Lot #" rows are left out, as are obvious test posts.
+ */
+export async function getRequirementsPage(params: {
+  page?: number;
+  pageSize?: number;
+  categorySlug?: string;
+  search?: string;
+  location?: string;
+}): Promise<{ data: Requirement[]; totalCount: number; totalPages: number }> {
+  const page = Math.max(1, params.page ?? 1);
+  const pageSize = params.pageSize ?? 12;
+  const byCategory = Boolean(params.categorySlug && params.categorySlug !== 'all');
+
+  let query = supabase
+    .from('requirements')
+    .select(
+      `*, profiles!buyer_id(id,full_name,email,phone), ${byCategory ? 'categories!category_id!inner(id,name,slug)' : 'categories!category_id(id,name,slug)'}`,
+      { count: 'exact' },
+    )
+    .eq('status', 'active')
+    .order('created_at', { ascending: false })
+    .range((page - 1) * pageSize, page * pageSize - 1);
+
+  if (byCategory) query = query.eq('categories.slug', params.categorySlug as string);
+  if (params.search?.trim()) query = query.ilike('title', `%${params.search.trim()}%`);
+  if (params.location && params.location !== 'all') {
+    const place = params.location.trim();
+    query = query.or(`destination_city.ilike.%${place}%,delivery_location.ilike.%${place}%`);
+  }
+  if (!INCLUDE_TEMPLATE_SEED_DATA) query = query.not('title', 'like', SEEDED_RFQ_TITLE_LIKE);
+
+  const { data, count, error } = await query;
+  if (error || !Array.isArray(data)) return { data: [], totalCount: 0, totalPages: 1 };
+
+  const isTestTitle = (title: string) => /\b(test|debug|timed|timeout)\b/i.test(title);
+  const rows = (data as unknown as Requirement[]).filter((row) => !isTestTitle(row.title || '') && !isSeededRequirement(row));
+  const totalCount = count ?? rows.length;
+  return { data: rows, totalCount, totalPages: Math.max(1, Math.ceil(totalCount / pageSize)) };
+}
+
 export async function getRequirementById(id: string): Promise<Requirement | null> {
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
   
@@ -838,7 +666,7 @@ export async function getRequirementById(id: string): Promise<Requirement | null
   }
 
   const { data } = await query.maybeSingle();
-  if (data) return data;
+  if (data) return isSeededRequirement(data) ? null : data;
 
   // If not found with exact/pattern match and not UUID, try fallback lookup by req_number directly
   const { data: byReqNum } = await supabase
@@ -847,7 +675,7 @@ export async function getRequirementById(id: string): Promise<Requirement | null
     .eq('req_number', id)
     .maybeSingle();
 
-  return byReqNum || null;
+  return byReqNum && !isSeededRequirement(byReqNum) ? byReqNum : null;
 }
 
 export async function incrementRequirementViewCount(id: string): Promise<void> {
@@ -1236,105 +1064,6 @@ export async function getOrCreateConversation(buyerId: string, supplierId: strin
 // ============================================================
 
 const INQUIRIES_STORAGE_KEY = 'bulkskart_supplier_inquiries_store';
-
-const DEFAULT_MOCK_INQUIRIES: SupplierInquiry[] = [
-  {
-    id: 'inq-seed-001',
-    conversation_id: 'conv-inq-seed-001',
-    supplier_company_id: 'ref-mfr-abc',
-    supplier_name: 'ABC Precision Engineering Ltd',
-    sender_name: 'Vikram Malhotra',
-    sender_email: 'v.malhotra@indotech-solutions.in',
-    sender_phone: '+91 98201 44892',
-    sender_company: 'IndoTech Global Solutions Pvt Ltd',
-    subject: 'RFQ: 2,500 Units Industrial Microcontroller & CNC Assemblies',
-    message: 'Hello team, we are expanding our smart IoT meter production line and need 2,500 units by Q3. Could you share technical datasheet, MOQ tier pricing, and estimated FOB sea freight transit time to Mumbai Port? Also confirm IEC 60730 standard compliance.',
-    product_id: 'prod-abc-1',
-    product_name: 'Industrial 32-Bit ARM Cortex-M4 Microcontroller LQFP-64',
-    product_slug: 'industrial-arm-cortex-m4-microcontroller-lqfp64',
-    target_quantity: 2500,
-    quantity_unit: 'Pieces',
-    created_at: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
-    status: 'replied',
-    replies: [
-      {
-        id: 'rep-seed-001-1',
-        sender: 'supplier',
-        sender_name: 'Rajesh Sharma (Key Account Mgr)',
-        content: 'Dear Vikram, thank you for reaching out! Yes, all our MCUs are IEC 60730 Class B certified. For 2,500 units, our FOB unit price is $2.15/pc with a 14-day lead time. I will email the full calibration report shortly.',
-        created_at: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
-      }
-    ]
-  },
-  {
-    id: 'inq-seed-002',
-    conversation_id: 'conv-inq-seed-002',
-    supplier_company_id: 'ref-mfr-shenzhen',
-    supplier_name: 'Shenzhen MicroTech Semiconductor Co., Ltd.',
-    sender_name: 'Elena Rostova',
-    sender_email: 'e.rostova@nordic-embedded.eu',
-    sender_phone: '+49 89 2345 6789',
-    sender_company: 'Nordic Embedded Systems GmbH',
-    subject: 'Custom 8-Layer Rigid-Flex SMT PCB Production Quotation',
-    message: 'We are looking for turnkey assembly of 1,200 rigid-flex boards with automated optical inspection and flying probe test. We have the Gerber and BOM files ready. Can you sign our NDA and share your current factory lead time?',
-    product_id: 'prod-semi-002',
-    product_name: 'Custom High-Density 8-Layer Rigid-Flex SMT PCB Assembly',
-    product_slug: 'custom-high-density-rigid-flex-pcb-assembly',
-    target_quantity: 1200,
-    quantity_unit: 'Boards',
-    created_at: new Date(Date.now() - 1000 * 60 * 120).toISOString(),
-    status: 'new',
-    replies: []
-  },
-  {
-    id: 'inq-seed-003',
-    conversation_id: 'conv-inq-seed-003',
-    supplier_company_id: 'ref-mfr-milan',
-    supplier_name: 'Milan Luxury BioPackaging S.r.l.',
-    sender_name: 'Claire Dubois',
-    sender_email: 'c.dubois@parfum-elysees.fr',
-    sender_phone: '+33 1 42 68 55 00',
-    sender_company: "Maison d'Élysées Parfumerie",
-    subject: 'Bespoke Rigid Gift Boxes with Gold Foil Stamping',
-    message: 'Bonjour, we require 8,000 luxury magnetic boxes with velvet inserts for our holiday fragrance launch. Need FSC certification verification and sample proofing dispatched to Paris within 7 days.',
-    product_id: 'prod-milan-001',
-    product_name: 'Luxury Rigid Cosmetic Gift Box with Magnetic Flap',
-    product_slug: 'luxury-rigid-cosmetic-gift-box-magnetic-flap',
-    target_quantity: 8000,
-    quantity_unit: 'Pieces',
-    created_at: new Date(Date.now() - 1000 * 60 * 300).toISOString(),
-    status: 'new',
-    replies: []
-  },
-  {
-    id: 'inq-seed-004',
-    conversation_id: 'conv-inq-seed-004',
-    supplier_company_id: 'ref-mfr-zurich',
-    supplier_name: 'Zurich MedTech Precision Instruments AG',
-    sender_name: 'Dr. Marcus Vance',
-    sender_email: 'm.vance@apex-implants.com',
-    sender_phone: '+1 (617) 555-0199',
-    sender_company: 'Apex Orthopedic Implants USA',
-    subject: 'Titanium Grade 5 Trauma Plate OEM Supply Agreement',
-    message: 'We would like to inspect your ISO 13485 cleanroom audit records and discuss an initial batch of 200 pediatric locking plate sets. Are cleanroom lot certificates provided with each shipment?',
-    product_id: 'prod-zurich-001',
-    product_name: 'Titanium Grade 5 Orthopedic Trauma Locking Plates & Screws',
-    product_slug: 'titanium-grade-5-orthopedic-trauma-locking-plates',
-    target_quantity: 200,
-    quantity_unit: 'Sets',
-    created_at: new Date(Date.now() - 1000 * 60 * 720).toISOString(),
-    status: 'replied',
-    replies: [
-      {
-        id: 'rep-seed-004-1',
-        sender: 'supplier',
-        sender_name: 'Dr. Beatrix Meier (Quality Assurance)',
-        content: 'Dear Dr. Vance, ISO 13485 and CE MDR Class IIb certificates are attached to our supplier dossier. Every lot comes with full 3.1 chemical & mechanical mill certificates and particle count inspection.',
-        created_at: new Date(Date.now() - 1000 * 60 * 600).toISOString(),
-      }
-    ]
-  }
-];
 
 function getLocalInquiries(): SupplierInquiry[] {
   try {
@@ -1730,11 +1459,6 @@ export async function getCompanyCertifications(companyId: string): Promise<Compa
     // ignore
   }
 
-  // Check Mockup Registry only if companyId is a known mock identifier
-  if (companyId.startsWith('ref-mfr-') && MOCKUP_SUPPLIER_CERTS[companyId]) {
-    return MOCKUP_SUPPLIER_CERTS[companyId];
-  }
-
   // Real manufacturers show only their genuine uploaded & verified certificates
   return [];
 }
@@ -1898,11 +1622,6 @@ export async function getCompanyReviews(companyId: string): Promise<CompanyRevie
     if (Array.isArray(data) && data.length > 0) return data;
   } catch {
     // ignore
-  }
-
-  // Check Mockup Registry only for known demo supplier IDs
-  if (companyId.startsWith('ref-mfr-') && MOCKUP_SUPPLIER_REVIEWS[companyId]) {
-    return MOCKUP_SUPPLIER_REVIEWS[companyId];
   }
 
   // Authentic companies only show real verified buyer reviews

@@ -485,7 +485,7 @@ export default function SEOHubPage({ forcedSlug }: { forcedSlug?: string }) {
             </div>
             <Link to="/manufacturers">
               <Button variant="outline" size="sm" className="border-border hover:border-[#FF5A00] text-xs font-bold gap-1.5 self-start">
-                <span>View All 5,000+ Suppliers</span>
+                <span>View all suppliers</span>
                 <ChevronRight className="w-3.5 h-3.5" />
               </Button>
             </Link>

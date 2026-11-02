@@ -12,7 +12,6 @@ import type { Product, Category } from '@/types/types';
 import SafeImage from '@/components/common/SafeImage';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useCountry } from '@/contexts/CurrencyContext';
-import { CURATED_INDUSTRIAL_PRODUCTS } from '@/data/curatedIndustrialProducts';
 import { matchProductImage } from '@/lib/productImageMatchingEngine';
 
 const COUNTRIES = [
@@ -311,7 +310,7 @@ export default function ProductsPage() {
     <MainLayout>
       <PageMeta
         title="Bulk Wholesale Products Catalog — Factory Direct Pricing & MOQs | BulkSkart"
-        description="Browse 100,000+ wholesale products across industrial machinery, electronics, apparel, raw materials, chemicals, and packaging from verified global manufacturers. Compare tiered volume pricing and send instant RFQs."
+        description="Browse wholesale products across industrial machinery, electronics, apparel, raw materials, chemicals, and packaging from verified global manufacturers. Compare tiered volume pricing and send instant RFQs."
         keywords="bulk products catalog, wholesale prices India, minimum order quantity, B2B product sourcing, verified supplier products, factory direct MOQ wholesale"
         canonical="/products"
         ogType="website"

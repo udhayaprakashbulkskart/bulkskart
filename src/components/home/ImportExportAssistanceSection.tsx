@@ -65,8 +65,8 @@ export default function ImportExportAssistanceSection() {
     },
     {
       icon: Box,
-      title: 'AI Global Sourcing',
-      desc: 'Match verified factories worldwide by target volume, lead time and standards.',
+      title: 'Supplier Search',
+      desc: 'Find the suppliers whose listed products match what you need to source.',
     },
     {
       icon: FileCheck2,
@@ -75,8 +75,8 @@ export default function ImportExportAssistanceSection() {
     },
     {
       icon: Truck,
-      title: 'Shipment Coordination',
-      desc: 'Container bookings & customs clearance handled by licensed freight partners.',
+      title: 'Shipment Request',
+      desc: 'Send your shipment details to the BulkSkart team. Shipping lines and licensed customs brokers carry out the freight.',
     },
   ];
 
@@ -94,13 +94,13 @@ export default function ImportExportAssistanceSection() {
             <div className="max-w-2xl">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#FF5A00]/15 border border-[#FF5A00]/30 text-[#FF8A3D] text-xs font-bold uppercase tracking-wider mb-3">
                 <Sparkles className="w-3.5 h-3.5 fill-[#FF5A00]" />
-                <span>Optional Extra Feature • Powered by Trade AI</span>
+                <span>Optional Extra Feature</span>
               </div>
               <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight text-white leading-tight">
                 AI Import & Export <span className="text-[#FF5A00]">Assistance</span>
               </h2>
               <p className="text-sm sm:text-base text-slate-300 mt-2 leading-relaxed">
-                Seamless international sourcing, landed cost estimates, compliance checklists, and end-to-end shipment coordination for global buyers and manufacturers.
+                Supplier search, landed cost estimates, compliance checklists and a shipment request form for buyers and manufacturers.
               </p>
             </div>
 

@@ -60,7 +60,7 @@ export const ADDON_SERVICES: Record<string, AddonServiceConfig> = {
     badge: '🔥 Fast Liquidation',
     features: [
       'Top Homepage & Marketplace 24H Spotlight',
-      'Broadcast to 10,000+ Active Global Buyers',
+      'Broadcast your offer to buyers on BulkSkart',
       'Direct Factory WhatsApp / Call Priority',
       'High Urgency 24-Hour Deal Banner',
       'Zero Commission on Bulk Orders',

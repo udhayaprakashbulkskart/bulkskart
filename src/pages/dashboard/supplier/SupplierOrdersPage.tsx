@@ -129,7 +129,7 @@ export default function SupplierOrdersPage() {
                           <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground flex-wrap">
                             <span>Buyer: {buyer?.full_name ?? '—'}</span>
                             <ProtectedContact
-                              phone={(order as any).buyer?.phone || (order as any).buyer_phone || '+91 98201 44892'}
+                              phone={(order as any).buyer?.phone || (order as any).buyer_phone}
                               contactType="buyer"
                               variant="inline"
                               showActions={true}

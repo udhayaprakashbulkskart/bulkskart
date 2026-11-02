@@ -2,6 +2,7 @@ import React from 'react';
 import { useParams, Link } from 'react-router-dom';
 import MainLayout from '@/components/layouts/MainLayout';
 import PageMeta from '@/components/common/PageMeta';
+import NotFound from '@/pages/NotFound';
 import Breadcrumbs from '@/components/common/Breadcrumbs';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -37,7 +38,7 @@ export const BLOG_POSTS: Record<string, BlogPostData> = {
     title: 'How to Find Verified Manufacturers in India (2026 Sourcing Guide)',
     metaDescription: 'Step-by-step guide to finding, vetting, and negotiating with verified Indian factories. Learn how to verify GST, audit production capabilities, and avoid trade risks.',
     category: 'Supplier Guides',
-    author: 'Amit Verma, Head of Trade Compliance',
+    author: 'BulkSkart Editorial Team',
     date: '02 Oct 2026',
     readTime: '7 min',
     h1: 'How to Find and Vet Reliable Manufacturers in India',
@@ -97,7 +98,7 @@ export const BLOG_POSTS: Record<string, BlogPostData> = {
     title: 'What is MOQ in Wholesale & Manufacturing? Complete Guide for Buyers',
     metaDescription: 'Understand Minimum Order Quantity (MOQ) in B2B trade. Learn why factories set MOQs, how to calculate them, and proven negotiation strategies to lower them.',
     category: 'Trade Tips',
-    author: 'Priya Sharma, Senior Sourcing Strategist',
+    author: 'BulkSkart Editorial Team',
     date: '28 Sep 2026',
     readTime: '6 min',
     h1: 'What is Minimum Order Quantity (MOQ) and How to Negotiate It',
@@ -138,7 +139,7 @@ export const BLOG_POSTS: Record<string, BlogPostData> = {
     title: 'How to Buy Products in Bulk Directly from Factories (2026)',
     metaDescription: 'Complete step-by-step tutorial on buying wholesale products in bulk. Master RFQs, compare quotations, inspect goods, and secure trade payments.',
     category: 'Buyer Resources',
-    author: 'Rajesh Kumar, VP of Global Operations',
+    author: 'BulkSkart Editorial Team',
     date: '20 Sep 2026',
     readTime: '8 min',
     h1: 'The Ultimate Guide to Buying Products in Bulk Online',
@@ -183,7 +184,7 @@ export const BLOG_POSTS: Record<string, BlogPostData> = {
     title: 'Manufacturer vs Wholesaler: Which Sourcing Partner is Right for You?',
     metaDescription: 'Compare manufacturers vs wholesale suppliers. Discover pricing differences, lead times, MOQ requirements, and how to choose the right partner on Bulkskart.',
     category: 'Trade Tips',
-    author: 'Amit Verma, Head of Trade Compliance',
+    author: 'BulkSkart Editorial Team',
     date: '15 Sep 2026',
     readTime: '5 min',
     h1: 'Manufacturer vs Wholesaler: Key Differences and Sourcing Strategy',
@@ -224,7 +225,7 @@ export const BLOG_POSTS: Record<string, BlogPostData> = {
     title: 'How to Write an RFQ (Request for Quotation) That Gets 10+ Fast Quotes',
     metaDescription: 'Master the art of writing a high-converting RFQ. Step-by-step template, critical fields, and tips to attract verified suppliers on Bulkskart.',
     category: 'Trade Tips',
-    author: 'Priya Sharma, Senior Sourcing Strategist',
+    author: 'BulkSkart Editorial Team',
     date: '10 Sep 2026',
     readTime: '6 min',
     h1: 'How to Write a Winning Request for Quotation (RFQ)',
@@ -263,7 +264,10 @@ export const BLOG_POSTS: Record<string, BlogPostData> = {
 
 export default function BlogDetailPage() {
   const { slug } = useParams<{ slug: string }>();
-  const post = BLOG_POSTS[slug || ''] || BLOG_POSTS['how-to-find-manufacturers-in-india'];
+  const post = BLOG_POSTS[slug || ''];
+
+  // An unknown address is "not found", not a copy of the first article under a different URL.
+  if (!post) return <NotFound />;
 
   const breadcrumbs = [
     { name: 'Home', item: '/' },

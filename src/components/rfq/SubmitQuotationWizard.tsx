@@ -581,7 +581,7 @@ export default function SubmitQuotationWizard({
                   Quotation Submitted Successfully!
                 </h3>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Your quotation has been submitted for RFQ ID: <strong className="text-foreground font-mono">{rfq.reqNumber || 'BS-RFQ-1042'}</strong>
+                  Your quotation has been submitted for RFQ: <strong className="text-foreground">{rfq.reqNumber || rfq.title}</strong>
                 </p>
               </div>
 

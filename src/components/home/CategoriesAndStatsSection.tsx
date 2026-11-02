@@ -9,7 +9,6 @@ import {
 interface CategoryItem {
   id: string;
   name: string;
-  count: string;
   description: string;
   icon: React.ComponentType<{ className?: string }>;
   iconBadgeStyle: string;
@@ -22,7 +21,6 @@ const CATEGORIES: CategoryItem[] = [
   {
     id: 'cat-textiles',
     name: 'Textiles & Knitted Fabrics',
-    count: '12,400+ Products',
     description: 'Fabrics, yarns, woven rolls, cotton and apparel',
     icon: Shirt,
     iconBadgeStyle: 'bg-[#221612] border-[#FF5A00]/40 text-[#FF5A00]',
@@ -33,7 +31,6 @@ const CATEGORIES: CategoryItem[] = [
   {
     id: 'cat-steel',
     name: 'Steel & Structural Metals',
-    count: '8,900+ Products',
     description: 'Steel beams, pipes, hollow tubes, rebar and structures',
     icon: Factory,
     iconBadgeStyle: 'bg-[#1b1c25] border-orange-500/40 text-orange-400',
@@ -44,7 +41,6 @@ const CATEGORIES: CategoryItem[] = [
   {
     id: 'cat-machinery',
     name: 'Industrial Machinery & Equipment',
-    count: '6,200+ Products',
     description: 'Electric motors, industrial pumps, machinery & tools',
     icon: Cog,
     iconBadgeStyle: 'bg-[#221a12] border-amber-500/40 text-amber-400',
@@ -55,7 +51,6 @@ const CATEGORIES: CategoryItem[] = [
   {
     id: 'cat-polymers',
     name: 'Polymers & Plastic Raw Materials',
-    count: '5,800+ Products',
     description: 'Virgin polymers, resins, HDPE, LDPE and plastic pellets',
     icon: Layers,
     iconBadgeStyle: 'bg-[#1c142c] border-purple-500/40 text-purple-400',
@@ -66,7 +61,6 @@ const CATEGORIES: CategoryItem[] = [
   {
     id: 'cat-chemicals',
     name: 'Chemicals & Solvents',
-    count: '4,100+ Products',
     description: 'Industrial solvents, reagents, acids and specialty chemicals',
     icon: FlaskConical,
     iconBadgeStyle: 'bg-[#101e28] border-cyan-500/40 text-cyan-400',
@@ -77,7 +71,6 @@ const CATEGORIES: CategoryItem[] = [
   {
     id: 'cat-packaging',
     name: 'Corrugated Packaging',
-    count: '7,300+ Products',
     description: 'Kraft boxes, corrugated cartons, shipping crates & rolls',
     icon: Package,
     iconBadgeStyle: 'bg-[#241810] border-orange-500/40 text-orange-400',
@@ -150,9 +143,6 @@ export default function CategoriesAndStatsSection() {
                 <h3 className="font-extrabold text-white text-xs sm:text-[13.5px] md:text-sm leading-tight group-hover:text-[#FF5A00] transition-colors break-words">
                   {cat.name}
                 </h3>
-                <p className="text-[11px] sm:text-xs text-[#FF5A00] font-bold mt-1 sm:mt-1.5 whitespace-nowrap">
-                  {cat.count}
-                </p>
               </div>
 
               {/* Authentic Commodity Photography (Right Half) seamlessly blending into card */}

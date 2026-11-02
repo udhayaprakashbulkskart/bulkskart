@@ -31,7 +31,6 @@ import CategoriesAndStatsSection from '@/components/home/CategoriesAndStatsSecti
 import TrustAndFinalCTASection from '@/components/home/TrustAndFinalCTASection';
 import PostRequirementsHomeSection from '@/components/home/PostRequirementsHomeSection';
 import PlansHomeSection from '@/components/home/PlansHomeSection';
-import ReviewsHomeSection from '@/components/home/ReviewsHomeSection';
 import OrderBenefitsSection from '@/components/home/OrderBenefitsSection';
 import SafeImage, { toWebPUrl, buildWebPSrcSet } from '@/components/common/SafeImage';
 import SectionHeader from '@/components/home/SectionHeader';
@@ -91,21 +90,14 @@ const CARGO_IMG = 'https://cdn.pixabay.com/photo/2017/04/02/09/08/bulldozer-2195
 const SHIPPING_BANNER = 'https://cdn.pixabay.com/photo/2016/11/21/14/53/boxes-1845814_1280.jpg';
 
 const TOP_CATEGORIES = [
-  { label: 'Machinery &\nIndustrial',   slug: 'machinery-industrial',    rfqCount: '1,420+ Active RFQs', img: 'https://cdn.pixabay.com/photo/2016/09/12/07/48/mechanical-1663275_1280.jpg' },
-  { label: 'Electronics &\nElectrical',slug: 'electronics-electricals', rfqCount: '1,240+ Active RFQs', img: 'https://cdn.pixabay.com/photo/2015/09/05/20/02/motherboard-924904_1280.jpg' },
-  { label: 'Apparel &\nTextiles',      slug: 'textiles-apparel',         rfqCount: '2,890+ Active RFQs', img: 'https://cdn.pixabay.com/photo/2019/03/25/04/43/weaving-4079366_1280.jpg' },
-  { label: 'Construction &\nBuilding', slug: 'construction-real-estate', rfqCount: '1,650+ Active RFQs', img: 'https://cdn.pixabay.com/photo/2015/08/16/09/55/tile-890729_1280.jpg' },
-  { label: 'Packaging &\nPrinting',     slug: 'packaging',               rfqCount: '1,120+ Active RFQs', img: 'https://cdn.pixabay.com/photo/2014/04/05/11/07/cardboard-314504_1280.jpg' },
-  { label: 'Food &\nAgriculture',       slug: 'agriculture-food',        rfqCount: '3,150+ Active RFQs', img: 'https://cdn.pixabay.com/photo/2016/09/10/11/42/wheat-1659021_1280.jpg' },
-  { label: 'Chemicals &\nRaw Materials',slug: 'chemicals-raw-materials', rfqCount: '860+ Active RFQs',   img: 'https://cdn.pixabay.com/photo/2014/12/10/20/56/laboratory-563423_1280.jpg' },
-  { label: 'Medical &\nHealthcare',     slug: 'pharma-healthcare',       rfqCount: '980+ Active RFQs',   img: 'https://cdn.pixabay.com/photo/2021/02/03/03/22/chemistry-5976465_1280.jpg' },
-];
-
-const STATS = [
-  { value: '200+',  label: 'Countries',          icon: Globe },
-  { value: '500K+', label: 'Verified Suppliers',  icon: Users },
-  { value: '10M+',  label: 'Products',            icon: Package },
-  { value: '1M+',   label: 'Global Buyers',       icon: BarChart3 },
+  { label: 'Machinery &\nIndustrial',   slug: 'machinery-industrial', img: 'https://cdn.pixabay.com/photo/2016/09/12/07/48/mechanical-1663275_1280.jpg' },
+  { label: 'Electronics &\nElectrical',slug: 'electronics-electricals', img: 'https://cdn.pixabay.com/photo/2015/09/05/20/02/motherboard-924904_1280.jpg' },
+  { label: 'Apparel &\nTextiles',      slug: 'textiles-apparel', img: 'https://cdn.pixabay.com/photo/2019/03/25/04/43/weaving-4079366_1280.jpg' },
+  { label: 'Construction &\nBuilding', slug: 'construction-real-estate', img: 'https://cdn.pixabay.com/photo/2015/08/16/09/55/tile-890729_1280.jpg' },
+  { label: 'Packaging &\nPrinting',     slug: 'packaging', img: 'https://cdn.pixabay.com/photo/2014/04/05/11/07/cardboard-314504_1280.jpg' },
+  { label: 'Food &\nAgriculture',       slug: 'agriculture-food', img: 'https://cdn.pixabay.com/photo/2016/09/10/11/42/wheat-1659021_1280.jpg' },
+  { label: 'Chemicals &\nRaw Materials',slug: 'chemicals-raw-materials',   img: 'https://cdn.pixabay.com/photo/2014/12/10/20/56/laboratory-563423_1280.jpg' },
+  { label: 'Medical &\nHealthcare',     slug: 'pharma-healthcare',   img: 'https://cdn.pixabay.com/photo/2021/02/03/03/22/chemistry-5976465_1280.jpg' },
 ];
 
 const TRUST_FEATURES = [
@@ -120,24 +112,6 @@ const HOW_STEPS = [
   { icon: Package,  step: '2', title: 'Get Quotes',  desc: 'Receive quotations from verified suppliers' },
   { icon: Users,    step: '3', title: 'Compare',     desc: 'Compare prices, choose the best deal' },
   { icon: Zap,      step: '4', title: 'Grow',        desc: 'Place orders and scale your business' },
-];
-
-const PRODUCTS = [
-  { name: 'Solar Panels',        moq: 'MOQ: 100 Pieces',   usdMin: 0.18,  usdMax: 0.25,  img: 'https://cdn.pixabay.com/photo/2020/10/03/09/05/solar-energy-5622969_1280.jpg' },
-  { name: 'Premium Basmati Rice',moq: 'MOQ: 1 Ton',        usdMin: 520,   usdMax: 560,   img: 'https://cdn.pixabay.com/photo/2016/09/10/11/42/wheat-1659021_1280.jpg' },
-  { name: 'Industrial Water Pump',moq: 'MOQ: 10 Pieces',   usdMin: 120,   usdMax: 150,   img: 'https://cdn.pixabay.com/photo/2017/10/04/21/01/turbine-engine-2817617_1280.jpg' },
-  { name: 'Ergonomic Office Chair',moq: 'MOQ: 50 Pieces',  usdMin: 25,    usdMax: 35,    img: 'https://cdn.pixabay.com/photo/2016/11/21/14/53/boxes-1845814_1280.jpg' },
-  { name: 'Cotton Fabric Rolls',  moq: 'MOQ: 500 Meters',  usdMin: 1.2,   usdMax: 1.8,   img: 'https://cdn.pixabay.com/photo/2019/03/25/04/43/weaving-4079366_1280.jpg' },
-  { name: 'Smartphones (Bulk)',   moq: 'MOQ: 100 Pieces',  usdMin: 90,    usdMax: 110,   img: 'https://cdn.pixabay.com/photo/2020/03/31/13/26/processor-4987614_1280.jpg' },
-];
-
-const SUPPLIERS = [
-  { name: 'Shenzhen Tech Co.', country: 'China', flag: '🇨🇳', industry: 'Electronics', rating: 4.8, img: 'https://cdn.pixabay.com/photo/2015/09/05/20/02/motherboard-924904_1280.jpg' },
-  { name: 'Kamal Textiles', country: 'India', flag: '🇮🇳', industry: 'Textiles', rating: 4.7, img: 'https://cdn.pixabay.com/photo/2019/03/25/04/43/weaving-4079366_1280.jpg' },
-  { name: 'Global Agro Ltd.', country: 'UAE', flag: '🇦🇪', industry: 'Food & Agri', rating: 4.9, img: 'https://cdn.pixabay.com/photo/2016/09/10/11/42/wheat-1659021_1280.jpg' },
-  { name: 'Sunrise Machinery', country: 'Germany', flag: '🇩🇪', industry: 'Industrial', rating: 4.6, img: 'https://cdn.pixabay.com/photo/2016/09/12/07/48/mechanical-1663275_1280.jpg' },
-  { name: 'StyleHome Industries', country: 'Turkey', flag: '🇹🇷', industry: 'Furniture', rating: 4.7, img: 'https://cdn.pixabay.com/photo/2017/04/02/09/08/bulldozer-2195329_1280.jpg' },
-  { name: 'GreenChem Industries', country: 'USA', flag: '🇺🇸', industry: 'Chemicals', rating: 4.8, img: 'https://cdn.pixabay.com/photo/2014/12/10/20/56/laboratory-563423_1280.jpg' },
 ];
 
 
@@ -520,9 +494,6 @@ function TopCategoriesSection() {
                 <span className="text-xs md:text-sm font-bold text-foreground leading-tight text-center line-clamp-2 group-hover:text-[#FF5A00] transition-colors px-0.5 mt-auto min-h-[30px] flex items-center justify-center">
                   {cat.label.replace('\n', ' ')}
                 </span>
-                <span className="text-[10px] text-[#FF5A00] font-semibold mt-1">
-                  {cat.rfqCount}
-                </span>
               </Link>
             ))}
           </div>
@@ -545,9 +516,6 @@ function TopCategoriesSection() {
                 </div>
                 <span className="text-[11px] font-bold text-foreground leading-tight text-center line-clamp-2 group-hover:text-[#FF5A00] transition-colors px-0.5 mt-auto min-h-[28px] flex items-center justify-center">
                   {cat.label.replace('\n', ' ')}
-                </span>
-                <span className="text-[9px] text-[#FF5A00] font-semibold mt-0.5 truncate w-full">
-                  {cat.rfqCount}
                 </span>
               </Link>
             ))}
@@ -610,7 +578,7 @@ export default function HomePage() {
         faq={[
           {
             question: "What is BulkSkart?",
-            answer: "BulkSkart is India's leading global B2B wholesale marketplace connecting verified bulk buyers directly with verified global manufacturers and industrial exporters across India, USA, UAE, Germany, and 180+ countries.",
+            answer: "BulkSkart is India's leading global B2B wholesale marketplace connecting verified bulk buyers directly with verified global manufacturers and industrial exporters.",
           },
           {
             question: "Is posting a bulk requirement (RFQ) free for buyers?",
@@ -704,11 +672,6 @@ export default function HomePage() {
           SECTION 9: PLANS (MONTHLY SUPPLIER SUBSCRIPTIONS - NO ANNUAL BILLING)
       ═══════════════════════════════════════════════════ */}
       <PlansHomeSection />
-
-      {/* ═══════════════════════════════════════════════════
-          SECTION 10: REVIEWS (VERIFIED BUYER & MANUFACTURER TESTIMONIALS)
-      ═══════════════════════════════════════════════════ */}
-      <ReviewsHomeSection />
 
       {/* ═══════════════════════════════════════════════════
           CRAWLABLE B2B MARKETPLACE OVERVIEW (SEO & BUYER GUIDE)

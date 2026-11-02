@@ -53,7 +53,7 @@ const GUIDED_PROMPTS = [
 
 const AI_KNOWLEDGE_BASE: Record<string, { answer: string; route?: string; routeLabel?: string }> = {
   manufacturer: {
-    answer: 'BulkSkart features 50,000+ verified factories across India, China, Germany, UAE, and 180+ countries. Every manufacturer undergoes GST/IEC audits, ISO/CE factory certifications, and past order verification.',
+    answer: 'BulkSkart lists manufacturers from India and other countries. Every verified manufacturer undergoes GST/IEC audits, ISO/CE factory certifications, and past order verification.',
     route: '/manufacturers',
     routeLabel: 'Browse Verified Manufacturers',
   },

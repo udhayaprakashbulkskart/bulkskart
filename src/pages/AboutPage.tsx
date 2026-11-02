@@ -5,25 +5,11 @@ import Header from '@/components/layouts/Header';
 import Footer from '@/components/layouts/Footer';
 import PageMeta from '@/components/common/PageMeta';
 
-const STATS = [
-  { value: '50,000+', label: 'Verified Buyers' },
-  { value: '12,000+', label: 'Suppliers & Manufacturers' },
-  { value: '180+', label: 'Countries Served' },
-  { value: '₹500Cr+', label: 'Trade Volume Facilitated' },
-];
-
 const VALUES = [
   { icon: ShieldCheck, title: 'Trust First', desc: 'Every supplier on BulkSkart is verified through a multi-step process — GST, business registration, and physical address validation.' },
-  { icon: Globe, title: 'Global Reach', desc: 'We connect Indian manufacturers with buyers across 180+ countries, opening new markets for SMEs that were previously inaccessible.' },
+  { icon: Globe, title: 'Global Reach', desc: 'We connect Indian manufacturers with buyers worldwide, opening new markets for SMEs that were previously inaccessible.' },
   { icon: TrendingUp, title: 'Transparent Trade', desc: 'Real-time RFQs, live quotations, and dispute resolution tools ensure every transaction is fair and traceable.' },
   { icon: Users, title: 'Community Driven', desc: 'BulkSkart grows with its members. Buyer feedback and supplier ratings drive continuous improvement across the platform.' },
-];
-
-const TEAM = [
-  { name: 'Rajesh Kumar', role: 'CEO & Co-founder', initials: 'RK' },
-  { name: 'Priya Sharma', role: 'CTO & Co-founder', initials: 'PS' },
-  { name: 'Amit Verma', role: 'Head of Operations', initials: 'AV' },
-  { name: 'Neha Gupta', role: 'Head of Supplier Relations', initials: 'NG' },
 ];
 
 export default function AboutPage() {
@@ -58,18 +44,6 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* Stats */}
-      <section className="bg-primary/5 border-b border-border py-8 px-4">
-        <div className="max-w-4xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
-          {STATS.map(({ value, label }) => (
-            <div key={label}>
-              <div className="text-[22px] md:text-[30px] font-black text-primary leading-none mb-1">{value}</div>
-              <div className="text-xs text-muted-foreground font-medium">{label}</div>
-            </div>
-          ))}
-        </div>
-      </section>
-
       {/* Mission */}
       <section className="py-12 px-4 max-w-4xl mx-auto">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
@@ -101,31 +75,12 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* Team */}
-      <section className="bg-muted/40 border-t border-border py-12 px-4">
-        <div className="max-w-4xl mx-auto">
-          <h2 className="text-[20px] md:text-[26px] font-black text-foreground mb-2 text-center">Leadership Team</h2>
-          <p className="text-muted-foreground text-sm text-center mb-8">Building the future of B2B trade</p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
-            {TEAM.map(({ name, role, initials }) => (
-              <div key={name} className="bg-card border border-border rounded-xl p-4 text-center">
-                <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-black text-lg mx-auto mb-3">
-                  {initials}
-                </div>
-                <div className="text-sm font-bold text-foreground">{name}</div>
-                <div className="text-[11px] text-muted-foreground mt-0.5">{role}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* CTA */}
       <section className="py-12 px-4 text-center">
         <div className="max-w-2xl mx-auto">
           <BadgeCheck className="w-10 h-10 text-primary mx-auto mb-4" />
           <h2 className="text-[20px] md:text-[26px] font-black text-foreground mb-3">Ready to Trade Smarter?</h2>
-          <p className="text-muted-foreground text-sm mb-6">Join thousands of manufacturers and buyers already on BulkSkart.</p>
+          <p className="text-muted-foreground text-sm mb-6">Join the manufacturers and buyers on BulkSkart.</p>
           <div className="flex flex-col md:flex-row gap-3 justify-center">
             <Link to="/auth?tab=register"><Button className="bg-[#FF5A00] hover:bg-[#e04e00] text-white font-bold h-11 px-8 gap-2 rounded-xl shadow-[0_2px_0_#922f00]"><Factory className="w-4 h-4" /> Join as Supplier</Button></Link>
             <Link to="/post-requirement"><Button className="bg-[#FF5A00] hover:bg-[#e04e00] text-white h-11 px-8 gap-2 font-bold rounded-xl shadow-[0_2px_0_#922f00]"><Users className="w-4 h-4" /> Post a Requirement</Button></Link>

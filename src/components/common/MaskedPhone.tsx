@@ -11,11 +11,7 @@ import {
   DialogFooter
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import {
-  getCountryMeta,
-  getCountryGuestMask,
-  getCompanyDisplayPhone
-} from '@/lib/countryPhoneCodes';
+import { getCountryMeta, getCountryGuestMask } from '@/lib/countryPhoneCodes';
 
 interface MaskedPhoneProps {
   /** Raw phone string, e.g. "+971 4 398 5210" or "+919876543210" */
@@ -24,7 +20,7 @@ interface MaskedPhoneProps {
   country?: string | null;
   /** When true, shows a green "Verified Contact" badge next to the revealed number */
   verified?: boolean;
-  /** Shown when phone is null/empty AND user is logged in */
+  /** Shown when the supplier has not stored a phone number */
   fallback?: string;
   /** Show/hide the phone icon before the number */
   showIcon?: boolean;
@@ -75,10 +71,19 @@ export default function MaskedPhone({
   const [revealed, setRevealed] = useState(false);
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
 
-  // If phone is provided or derived from country
-  const resolvedPhone = phone || (country ? getCompanyDisplayPhone({ country }) : null);
-  const formatted = resolvedPhone ? formatPhone(resolvedPhone, country) : null;
+  // Only a number the supplier actually stored is ever shown; nothing is generated from the country.
+  const formatted = phone?.trim() ? formatPhone(phone, country) : null;
   const masked = formatted ? maskPhone(formatted, country) : getCountryGuestMask(country);
+
+  // ── 0. No number on file: say so, whoever is looking ──────────────
+  if (!formatted) {
+    return (
+      <span className={`inline-flex items-center gap-1.5 text-xs text-muted-foreground ${className}`}>
+        {showIcon && <Phone className="w-3.5 h-3.5 shrink-0" />}
+        {fallback}
+      </span>
+    );
+  }
 
   // ── 1. Guest (not logged in) ──────────────────────────────────────
   if (!user) {
@@ -176,17 +181,7 @@ export default function MaskedPhone({
     );
   }
 
-  // ── 3. Logged in, no phone data available ─────────────────────────
-  if (!formatted) {
-    return (
-      <span className={`inline-flex items-center gap-1.5 text-xs text-muted-foreground ${className}`}>
-        {showIcon && <Phone className="w-3.5 h-3.5 shrink-0" />}
-        {fallback}
-      </span>
-    );
-  }
-
-  // ── 4. Paid Subscriber Manufacturer, Buyer, or Admin ──────────────
+  // ── 3. Paid Subscriber Manufacturer, Buyer, or Admin ──────────────
   return (
     <span className={`inline-flex items-center gap-1.5 text-xs ${className}`}>
       {showIcon && <Phone className="w-3.5 h-3.5 text-muted-foreground shrink-0" />}

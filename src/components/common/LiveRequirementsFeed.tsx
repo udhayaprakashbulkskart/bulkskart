@@ -40,10 +40,7 @@ import RequirementDetailDrawer from '@/components/common/RequirementDetailDrawer
 import SafeImage from '@/components/common/SafeImage';
 import SupplierRespondDialog from '@/components/common/SupplierRespondDialog';
 import { getRequirementVisualInfo } from '@/lib/requirementVisuals';
-import {
-  generateSyntheticRequirement,
-  TOTAL_SYSTEM_ACTIVE_RFQS
-} from '@/lib/largeRequirementsDataset';
+import { INCLUDE_TEMPLATE_SEED_DATA, SEEDED_RFQ_TITLE_LIKE, isSeededRequirement } from '@/lib/seedData';
 
 function AnimatedCount({ target }: { target: number }) {
   return <>{target.toLocaleString()}</>;
@@ -76,16 +73,11 @@ export default function LiveRequirementsFeed() {
   const { user, profile, company } = useAuth();
 
   const [reqs, setReqs] = useState<Requirement[]>([]);
-  const [totalCount, setTotalCount] = useState(TOTAL_SYSTEM_ACTIVE_RFQS);
+  const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Live Stream Controls
-  const [autoScroll, setAutoScroll] = useState(true);
-  const [liveSpeed, setLiveSpeed] = useState<'0.5x' | '1x' | '2x' | '3x'>('1x');
-  const [speedMenuOpen, setSpeedMenuOpen] = useState(false);
-  const [countdownSec, setCountdownSec] = useState(13);
   const [pageOffset, setPageOffset] = useState(0);
 
   // Live Alerts state
@@ -98,9 +90,6 @@ export default function LiveRequirementsFeed() {
   const [detailDrawerOpen, setDetailDrawerOpen] = useState(false);
   const [respondDialogReq, setRespondDialogReq] = useState<Requirement | null>(null);
 
-  // Dynamic 5-minute rotation tracking
-  const initial5MinCycle = Math.floor(Date.now() / (5 * 60 * 1000));
-  const nextCatalogPointerRef = useRef((initial5MinCycle * 19) % 600 + 16);
   // Session-wide deduplication tracking: no RFQ appears more than once in the same feed/session
   const displayedRfqIdsRef = useRef<Set<string>>(new Set());
   const displayedTitlesRef = useRef<Set<string>>(new Set());
@@ -142,22 +131,16 @@ export default function LiveRequirementsFeed() {
           }
         }
       } catch (err) {
-        console.warn('DB getRequirements error (using synthetic pool):', err);
-      }
-
-      // Top-up feed to guarantee rich catalog with strictly unique requirements
-      let attempts = 0;
-      while (items.length < 16 && attempts < 100) {
-        const idx = nextCatalogPointerRef.current++;
-        const candidate = generateSyntheticRequirement(idx);
-        if (!isRfqAlreadyDisplayed(candidate)) {
-          recordRfqDisplayed(candidate);
-          items.push(candidate);
-        }
-        attempts++;
+        console.warn('Could not load requirements:', err);
       }
 
       setReqs(items);
+
+      // The real number of open requirements (the template's generated "Lot #" rows are not counted)
+      let countQuery = supabase.from('requirements').select('id', { count: 'exact', head: true }).eq('status', 'active');
+      if (!INCLUDE_TEMPLATE_SEED_DATA) countQuery = countQuery.not('title', 'like', SEEDED_RFQ_TITLE_LIKE);
+      const { count } = await countQuery;
+      setTotalCount(count ?? items.length);
     } catch (e) {
       console.error('Failed to load live requirements feed', e);
     } finally {
@@ -188,10 +171,7 @@ export default function LiveRequirementsFeed() {
       displayedTitlesRef.current.clear();
       displayedReqNumsRef.current.clear();
 
-      const newCycle = Math.floor(Date.now() / FIVE_MINUTES_MS);
-      nextCatalogPointerRef.current = (newCycle * 23) % 700 + 12;
       loadData();
-      toast.info('Live requirements feed refreshed with new buyer RFQs', { duration: 3000 });
     }, FIVE_MINUTES_MS);
 
     return () => clearInterval(interval);
@@ -220,7 +200,7 @@ export default function LiveRequirementsFeed() {
               .eq('id', payload.new.id)
               .maybeSingle();
 
-            if (!data) return;
+            if (!data || isSeededRequirement(data)) return;
             if (isRfqAlreadyDisplayed(data)) return;
             recordRfqDisplayed(data);
 
@@ -251,64 +231,17 @@ export default function LiveRequirementsFeed() {
     };
   }, [liveAlertsOn, isRfqAlreadyDisplayed, recordRfqDisplayed]);
 
-  // ── 3. Pull Next Fresh Unshown Post (Auto Live Stream & Refresh) ────────────
-  // When Auto Live Stream loads next post, if already displayed, skips it and loads next unique RFQ
-  const pullNextPost = useCallback(() => {
-    let attempts = 0;
-    let nextUniqueCandidate: Requirement | null = null;
-
-    while (attempts < 150) {
-      const idx = nextCatalogPointerRef.current++;
-      const candidate = generateSyntheticRequirement(idx);
-      if (!isRfqAlreadyDisplayed(candidate)) {
-        nextUniqueCandidate = candidate;
-        recordRfqDisplayed(candidate);
-        break;
-      }
-      attempts++;
-    }
-
-    if (nextUniqueCandidate) {
-      const candidate = nextUniqueCandidate;
-      setReqs(current => {
-        const filtered = current.filter(c => c.id !== candidate.id && normalizeTitle(c.title) !== normalizeTitle(candidate.title));
-        return [candidate, ...filtered].slice(0, 24);
-      });
-      setTotalCount(c => c + 1);
-    }
-  }, [isRfqAlreadyDisplayed, recordRfqDisplayed]);
-
-  // ── 4. Live Stream Countdown & Auto-Rotation ────────────────────────────────
-  useEffect(() => {
-    if (!autoScroll) return;
-
-    const speedMultiplier = liveSpeed === '3x' ? 3 : liveSpeed === '2x' ? 2 : liveSpeed === '0.5x' ? 0.5 : 1;
-    const intervalMs = Math.round(1000 / speedMultiplier);
-
-    const interval = setInterval(() => {
-      setCountdownSec(prev => {
-        if (prev <= 1) {
-          pullNextPost();
-          return 15;
-        }
-        return prev - 1;
-      });
-    }, intervalMs);
-
-    return () => clearInterval(interval);
-  }, [autoScroll, liveSpeed, pullNextPost]);
-
-  // ── 5. User Controls: Fresh RFQs, Next, Prev, Alerts ───────────────────────
+  // ── User controls: Fresh RFQs, Next, Prev, Alerts ───────────────────────
   const handleFreshRFQs = () => {
     setIsRefreshing(true);
-    pullNextPost();
-    toast.success('Fresh buyer inquiries loaded!');
-    setTimeout(() => setIsRefreshing(false), 600);
+    displayedRfqIdsRef.current.clear();
+    displayedTitlesRef.current.clear();
+    displayedReqNumsRef.current.clear();
+    loadData().finally(() => setIsRefreshing(false));
   };
 
   const handleNext = () => {
     setPageOffset(prev => prev + 1);
-    pullNextPost();
   };
 
   const handlePrev = () => {
@@ -319,7 +252,7 @@ export default function LiveRequirementsFeed() {
     setLiveAlertsOn(prev => {
       const next = !prev;
       if (next) {
-        toast.success('Live buying alerts activated for verified Indian buyers');
+        toast.success('Live buying alerts activated');
       } else {
         toast.info('Live buying alerts paused');
       }
@@ -486,93 +419,24 @@ export default function LiveRequirementsFeed() {
           })}
         </div>
 
-        {/* ── LIVE STREAM CONTROLS BAR matching Image 2 ────────────────────── */}
-        <div className="bg-card border border-border rounded-2xl p-2.5 sm:p-3 mb-3.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 shadow-sm">
-          {/* Top Row on Mobile: LIVE STREAM badge + countdown */}
-          <div className="flex items-center justify-between sm:justify-start gap-2 sm:gap-3 w-full sm:w-auto">
-            <span className="flex items-center gap-1.5 font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-1 rounded-full text-[11px] shadow-sm shrink-0">
-              <span className="relative flex h-2 w-2 shrink-0">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-              </span>
-              LIVE STREAM
-            </span>
-
-            <div className="text-xs text-muted-foreground flex items-center gap-1.5 shrink-0">
-              <Timer className="w-3.5 h-3.5 text-[#FF5A00] shrink-0" />
-              <span>
-                Next unique post in <strong className="text-foreground font-mono">{countdownSec}s</strong>
-              </span>
-            </div>
-          </div>
-
-          {/* Bottom Row on Mobile: Prev / Next + Speed + AUTO LIVE Toggle */}
-          <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
-            {/* Prev / Next & Speed */}
-            <div className="flex items-center gap-1.5">
-              <button
-                onClick={handlePrev}
-                aria-label="Previous requirement"
-                className="w-8 h-8 rounded-lg bg-muted hover:bg-muted/80 text-foreground flex items-center justify-center border border-border transition-colors min-h-[32px] min-w-[32px]"
-                title="Previous RFQ"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <button
-                onClick={handleNext}
-                aria-label="Next requirement"
-                className="w-8 h-8 rounded-lg bg-[#FF5A00] hover:bg-[#e04f00] text-white flex items-center justify-center font-bold shadow-sm transition-colors min-h-[32px] min-w-[32px]"
-                title="Next RFQ"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-
-              {/* Speed selector dropdown */}
-              <div className="relative">
-                <button
-                  onClick={() => setSpeedMenuOpen(prev => !prev)}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-muted text-foreground hover:bg-muted/80 border border-border text-xs font-medium transition-colors min-h-[32px]"
-                >
-                  <span>Speed: {liveSpeed}</span>
-                  <ChevronDown className="w-3 h-3 text-muted-foreground" />
-                </button>
-                {speedMenuOpen && (
-                  <div className="absolute left-0 sm:right-0 top-full mt-1 w-24 bg-popover border border-border rounded-lg shadow-xl z-30 py-1">
-                    {(['0.5x', '1x', '2x', '3x'] as const).map(s => (
-                      <button
-                        key={s}
-                        onClick={() => {
-                          setLiveSpeed(s);
-                          setSpeedMenuOpen(false);
-                        }}
-                        className={`w-full text-left px-3 py-1 text-xs transition-colors ${
-                          liveSpeed === s
-                            ? 'text-[#FF5A00] font-bold bg-muted'
-                            : 'text-foreground hover:bg-muted'
-                        }`}
-                      >
-                        Speed: {s}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* AUTO LIVE toggle */}
-            <button
-              onClick={() => setAutoScroll(prev => !prev)}
-              aria-label={autoScroll ? "Pause auto live" : "Resume auto live"}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all border shrink-0 min-h-[32px] ${
-                autoScroll
-                  ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/40 shadow-sm'
-                  : 'bg-muted text-muted-foreground border-border hover:text-foreground'
-              }`}
-            >
-              <span className={`w-2 h-2 rounded-full ${autoScroll ? 'bg-emerald-500 animate-pulse' : 'bg-muted-foreground/40'}`} />
-              <span>AUTO LIVE: {autoScroll ? 'ON' : 'OFF'}</span>
-            </button>
-          </div>
+        {/* ── PAGER ── */}
+        <div className="flex items-center justify-end gap-1.5 mb-3.5">
+          <button
+            onClick={handlePrev}
+            aria-label="Previous requirement"
+            className="w-8 h-8 rounded-lg bg-muted hover:bg-muted/80 text-foreground flex items-center justify-center border border-border transition-colors min-h-[32px] min-w-[32px]"
+            title="Previous RFQ"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <button
+            onClick={handleNext}
+            aria-label="Next requirement"
+            className="w-8 h-8 rounded-lg bg-[#FF5A00] hover:bg-[#e04f00] text-white flex items-center justify-center font-bold shadow-sm transition-colors min-h-[32px] min-w-[32px]"
+            title="Next RFQ"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
         </div>
 
         {/* ── RFQ CARDS (Compact 2-col desktop layout) ── */}

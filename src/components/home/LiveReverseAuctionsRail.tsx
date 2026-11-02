@@ -11,7 +11,6 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/db/supabase';
 import CreateReverseAuctionDialog from '@/components/auctions/CreateReverseAuctionDialog';
-import { getSimulatedAuctions } from '@/data/simulatedLiveAuctions';
 import { assignDistinctAuctionImages, resolveAuctionImage } from '@/lib/auctionImageResolver';
 
 export interface ReverseAuctionCardItem {
@@ -27,28 +26,6 @@ export interface ReverseAuctionCardItem {
   initialSeconds: number;
   image: string;
 }
-
-function simulatedAsRailCards(): ReverseAuctionCardItem[] {
-  const mapped = getSimulatedAuctions().map((a) => ({
-    id: a.id,
-    auctionNumber: a.auction_number,
-    auctionType: a.auction_type,
-    title: a.title,
-    category: a.auction_type === 'forward' ? 'Surplus Liquidation' : 'Industrial Bulk',
-    quantity: `${a.total_quantity.toLocaleString('en-IN')} ${a.quantity_unit}`,
-    priceRange: `₹${a.starting_price.toLocaleString('en-IN')} / ${a.quantity_unit}`,
-    location: a.delivery_location,
-    quotedCount: a.total_bids,
-    initialSeconds: Math.max(
-      0,
-      Math.floor((new Date(a.end_time).getTime() - Date.now()) / 1000)
-    ),
-    image: resolveAuctionImage({ id: a.id, title: a.title, existing: a.images }),
-  }));
-  return assignDistinctAuctionImages(mapped);
-}
-
-const FALLBACK_AUCTIONS: ReverseAuctionCardItem[] = simulatedAsRailCards();
 
 const CYCLE_SECONDS = 25;
 /** 3 roomier cards fit laptop screens better than a cramped 4-up row */
@@ -78,7 +55,7 @@ function formatTime(totalSeconds: number): string {
 
 export default function LiveReverseAuctionsRail() {
   const navigate = useNavigate();
-  const [allAuctions, setAllAuctions] = useState<ReverseAuctionCardItem[]>(FALLBACK_AUCTIONS);
+  const [allAuctions, setAllAuctions] = useState<ReverseAuctionCardItem[]>([]);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [page, setPage] = useState(0);
   const [secondsRemaining, setSecondsRemaining] = useState(CYCLE_SECONDS);
@@ -88,9 +65,6 @@ export default function LiveReverseAuctionsRail() {
 
   const [timers, setTimers] = useState<Record<string, number>>(() => {
     const nextTimers: Record<string, number> = {};
-    FALLBACK_AUCTIONS.forEach(a => {
-      nextTimers[a.id] = a.initialSeconds;
-    });
     return nextTimers;
   });
 
@@ -112,20 +86,14 @@ export default function LiveReverseAuctionsRail() {
         .limit(60);
 
       if (!error && data && data.length > 0) {
-        // Filter out explicitly concluded or cancelled auctions
-        const validAuctions = data.filter((d: any) => 
-          d.status !== 'cancelled' && d.status !== 'sold' && d.status !== 'unsold'
+        // Only auctions that are running right now
+        const listToMap = data.filter((d: any) =>
+          (d.status === 'live' || d.status === 'closing_soon') && d.end_time && new Date(d.end_time).getTime() > currentTime
         );
-
-        const listToMap = validAuctions.length > 0 ? validAuctions : data;
 
         const mappedFromDb: ReverseAuctionCardItem[] = listToMap.map((d: any, idx: number) => {
           const end = d.end_time ? new Date(d.end_time).getTime() : 0;
-          let remaining = Math.max(0, Math.floor((end - currentTime) / 1000));
-          // Keep live feel inside a 24h window; never dump raw UUID category ids onto the UI
-          if (remaining <= 0 || remaining > MAX_RAIL_SECONDS) {
-            remaining = ((idx * 2741) % (6 * 3600)) + 45 * 60;
-          }
+          const remaining = Math.max(0, Math.floor((end - currentTime) / 1000));
 
           const auctionType: 'reverse' | 'forward' = d.auction_type === 'forward' ? 'forward' : 'reverse';
           const defaultImg = auctionType === 'forward'
@@ -149,8 +117,8 @@ export default function LiveReverseAuctionsRail() {
               ? `₹${Number(d.starting_price).toLocaleString('en-IN')} / ${d.quantity_unit || 'unit'}`
               : 'Competitive Bidding',
             location: d.delivery_location || 'Pan-India',
-            quotedCount: Number(d.total_bids) || (idx % 6) + 1,
-            initialSeconds: Math.min(remaining, MAX_RAIL_SECONDS),
+            quotedCount: Number(d.total_bids) || 0,
+            initialSeconds: remaining,
             image: resolveAuctionImage({
               id: d.id,
               title: d.title || '',
@@ -159,11 +127,7 @@ export default function LiveReverseAuctionsRail() {
           };
         });
 
-        const sims = simulatedAsRailCards();
-        const merged = assignDistinctAuctionImages([
-          ...mappedFromDb,
-          ...sims.filter((s) => !mappedFromDb.some((d) => d.id === s.id)),
-        ]);
+        const merged = assignDistinctAuctionImages(mappedFromDb);
         setAllAuctions(merged);
         const nextTimers: Record<string, number> = {};
         merged.forEach((a) => {
@@ -171,23 +135,13 @@ export default function LiveReverseAuctionsRail() {
         });
         setTimers(nextTimers);
       } else {
-        const sims = simulatedAsRailCards();
-        setAllAuctions(sims);
-        const nextTimers: Record<string, number> = {};
-        sims.forEach((a) => {
-          nextTimers[a.id] = a.initialSeconds;
-        });
-        setTimers(nextTimers);
+        setAllAuctions([]);
+        setTimers({});
       }
     } catch (err) {
       console.error('Error fetching live auctions for 24h rail:', err);
-      const sims = simulatedAsRailCards();
-      setAllAuctions(sims);
-      const nextTimers: Record<string, number> = {};
-      sims.forEach((a) => {
-        nextTimers[a.id] = a.initialSeconds;
-      });
-      setTimers(nextTimers);
+      setAllAuctions([]);
+      setTimers({});
     } finally {
       setIsSyncing(false);
     }
@@ -255,6 +209,9 @@ export default function LiveReverseAuctionsRail() {
     : allAuctions.slice(0, ITEMS_PER_PAGE);
 
   const progressPercent = ((CYCLE_SECONDS - secondsRemaining) / CYCLE_SECONDS) * 100;
+
+  // No running auctions in the database: the section is left out rather than filled with invented ones
+  if (!isSyncing && allAuctions.length === 0) return null;
 
   return (
     <section

@@ -17,7 +17,9 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/db/supabase';
 import { toast } from 'sonner';
-import type { Requirement } from '@/types/types';
+import type { Category, Requirement } from '@/types/types';
+import { getCategories, getProducts } from '@/lib/api';
+import { SUPPORT_EMAIL, WHATSAPP_CHAT_URL } from '@/lib/supportContact';
 import {
   SUPPORTED_TRADE_CURRENCIES,
   DEFAULT_FALLBACK_RATES,
@@ -25,6 +27,18 @@ import {
   convertCrossCurrency,
   formatCurrencyValue,
 } from '@/services/realtimeExchangeRate';
+
+/** A supplier whose listed products match the words typed into the sourcing search. */
+interface SourcingMatch {
+  companyId: string;
+  slug: string | null;
+  name: string;
+  location: string;
+  verified: boolean;
+  products: Array<{ name: string; slug: string; moq: number; moqUnit: string }>;
+}
+
+const SOURCING_STOP_WORDS = new Set(['with', 'and', 'for', 'the', 'from', 'that', 'this', 'into', 'type', 'grade', 'high', 'quality']);
 
 // Predefined HS Code and Tariff rates database
 interface CommodityRate {
@@ -212,25 +226,85 @@ export default function TradeAssistantPage() {
   const [shippingMode, setShippingMode] = useState<'sea_fcl' | 'sea_lcl' | 'air'>('sea_fcl');
   const [incoterm, setIncoterm] = useState('FOB');
 
-  // ── Tab 2: Sourcing Match State ──
-  const [sourcingQuery, setSourcingQuery] = useState('Electric forklift with 3.5 ton lifting capacity');
-  const [sourcingBudget, setSourcingBudget] = useState('50000');
-  const [sourcingCategory, setSourcingCategory] = useState('Machinery');
-  const [sourcingResults, setSourcingResults] = useState<Array<{ name: string; city: string; country: string; rating: number; moq: string; verified: boolean }>>([
-    { name: 'Pune Heavy Machinery Tech Pvt Ltd', city: 'Pune', country: 'India', rating: 4.9, moq: '2 Units', verified: true },
-    { name: 'Gujarat Precision Hydraulics Ltd', city: 'Ahmedabad', country: 'India', rating: 4.8, moq: '5 Units', verified: true },
-    { name: 'Nippon Material Handling Corp', city: 'Osaka', country: 'Japan', rating: 5.0, moq: '1 Unit', verified: true },
-  ]);
+  // ── Tab 2: Sourcing Match State (real products and suppliers from the BulkSkart directory) ──
+  const [sourcingQuery, setSourcingQuery] = useState('');
+  const [sourcingCategoryId, setSourcingCategoryId] = useState('');
+  const [sourcingCategories, setSourcingCategories] = useState<Category[]>([]);
+  const [sourcingResults, setSourcingResults] = useState<SourcingMatch[]>([]);
+  const [sourcingLoading, setSourcingLoading] = useState(false);
+  const [sourcingSearched, setSourcingSearched] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    getCategories()
+      .then((rows) => { if (alive) setSourcingCategories(rows); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
+
+  const handleFindSuppliers = async () => {
+    const terms = [...new Set(sourcingQuery.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length >= 3 && !SOURCING_STOP_WORDS.has(w)))].slice(0, 4);
+    if (terms.length === 0 && !sourcingCategoryId) {
+      toast.error('Describe the product you want to source, or pick a category.');
+      return;
+    }
+    setSourcingLoading(true);
+    try {
+      const lists = terms.length > 0
+        ? await Promise.all(terms.map((term) => getProducts({ search: term, categoryId: sourcingCategoryId || undefined, limit: 60 })))
+        : [await getProducts({ categoryId: sourcingCategoryId, limit: 60 })];
+      // One card per supplier, ranked by how many of the typed words their listed products matched.
+      const bySupplier = new Map<string, { match: SourcingMatch; hits: number }>();
+      for (const products of lists) {
+        for (const product of products) {
+          const company = product.companies;
+          if (!company) continue;
+          const entry = bySupplier.get(company.id) ?? {
+            match: {
+              companyId: company.id,
+              slug: company.slug ?? null,
+              name: company.company_name,
+              location: [company.city, company.country].filter(Boolean).join(', '),
+              verified: company.verification_status === 'verified',
+              products: [],
+            },
+            hits: 0,
+          };
+          entry.hits += 1;
+          if (!entry.match.products.some((item) => item.slug === product.slug)) {
+            entry.match.products.push({ name: product.name, slug: product.slug, moq: product.moq, moqUnit: product.moq_unit });
+          }
+          bySupplier.set(company.id, entry);
+        }
+      }
+      setSourcingResults([...bySupplier.values()].sort((a, b) => b.hits - a.hits).slice(0, 9).map((entry) => entry.match));
+      setSourcingSearched(true);
+    } catch {
+      toast.error('The supplier search failed. Please try again.');
+    } finally {
+      setSourcingLoading(false);
+    }
+  };
 
   // ── Tab 4: Shipment Coordination Form ──
-  const [coordOrigin, setCoordOrigin] = useState('Mumbai, India');
-  const [coordDest, setCoordDest] = useState('Los Angeles, CA, USA');
-  const [coordCargoDesc, setCoordCargoDesc] = useState('3.5 Ton Industrial Electric Forklifts');
-  const [coordReadyDate, setCoordReadyDate] = useState('2026-11-15');
+  const [coordOrigin, setCoordOrigin] = useState('');
+  const [coordDest, setCoordDest] = useState('');
+  const [coordCargoDesc, setCoordCargoDesc] = useState('');
+  const [coordReadyDate, setCoordReadyDate] = useState('');
   const [coordContainerType, setCoordContainerType] = useState('40ft High Cube Container');
-  const [coordNotes, setCoordNotes] = useState('Need door-to-door freight quotation including customs clearance at Port of LA.');
+  const [coordNotes, setCoordNotes] = useState('');
   const [coordSubmitted, setCoordSubmitted] = useState(false);
-  const [trackingNumber, setTrackingNumber] = useState('');
+
+  // The shipment details as one message, ready to send to the BulkSkart team.
+  const coordMessage = [
+    'Shipment coordination request',
+    `Pickup: ${coordOrigin}`,
+    `Destination: ${coordDest}`,
+    `Cargo: ${coordCargoDesc}`,
+    `Shipment type: ${coordContainerType}`,
+    `Cargo ready date: ${coordReadyDate}`,
+    coordNotes.trim() ? `Notes: ${coordNotes.trim()}` : '',
+  ].filter(Boolean).join('\n');
 
   // Fetch user RFQs on mount if authenticated
   useEffect(() => {
@@ -322,18 +396,14 @@ export default function TradeAssistantPage() {
   const commercialSpreadAmount = Math.round(totalLandedInTarget * 0.01);
   const totalWithCommercialSpread = Math.round(totalLandedInTarget + commercialSpreadAmount);
 
-  // Handle Shipment Coordination Submission
+  // The form is not stored anywhere: it is turned into a message the person sends to the BulkSkart team themselves.
   const handleSubmitCoordination = (e: React.FormEvent) => {
     e.preventDefault();
     if (!coordCargoDesc.trim()) {
       toast.error('Please enter a description of your cargo.');
       return;
     }
-
-    const newRef = `BK-SHIP-${Math.floor(100000 + Math.random() * 900000)}`;
-    setTrackingNumber(newRef);
     setCoordSubmitted(true);
-    toast.success('Shipment coordination request submitted! Partner logistics team notified.');
   };
 
   return (
@@ -407,7 +477,7 @@ export default function TradeAssistantPage() {
                 className="data-[state=active]:bg-[#FF5A00] data-[state=active]:text-white text-slate-300 font-bold text-xs sm:text-sm py-2.5 sm:py-3 rounded-xl flex items-center justify-center gap-2"
               >
                 <Box className="w-4 h-4" />
-                <span>AI Sourcing Match</span>
+                <span>Find Suppliers</span>
               </TabsTrigger>
               <TabsTrigger
                 value="documents"
@@ -926,8 +996,8 @@ export default function TradeAssistantPage() {
                   <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800/80 flex items-start gap-2.5 text-[11px] text-slate-400">
                     <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
                     <div>
-                      <span className="font-semibold text-white">External Partner Clearance: </span>
-                      Official customs clearance, final tariff determination, and Bill of Entry endorsement are executed by licensed customs brokers and verified carrier partners.
+                      <span className="font-semibold text-white">Estimate only: </span>
+                      These figures come from fixed assumptions (a flat freight rate and standard duty and tax rates). Final tariff determination, customs clearance and the Bill of Entry are done by a licensed customs broker, so confirm the real figures with one before you commit.
                     </div>
                   </div>
 
@@ -945,10 +1015,10 @@ export default function TradeAssistantPage() {
                     </Button>
                     <Button
                       onClick={() => {
-                        toast.success('Landed cost estimation report saved to your clipboard & dashboard!');
-                        try {
-                          navigator.clipboard.writeText(`Bulkskart Landed Cost Estimate for ${commodity.name}: Total Landed ${formatCurrencyValue(totalLandedInTarget, targetCurrency)} (${formatCurrencyValue(unitLandedInTarget, targetCurrency)}/unit) [Rate: 1 ${baseCurrency} = ${directExchangeRate} ${targetCurrency}]`);
-                        } catch {}
+                        navigator.clipboard
+                          .writeText(`Bulkskart Landed Cost Estimate for ${commodity.name}: Total Landed ${formatCurrencyValue(totalLandedInTarget, targetCurrency)} (${formatCurrencyValue(unitLandedInTarget, targetCurrency)}/unit) [Rate: 1 ${baseCurrency} = ${directExchangeRate} ${targetCurrency}]`)
+                          .then(() => toast.success('Landed cost estimate copied to your clipboard.'))
+                          .catch(() => toast.error('Your browser did not allow copying. Please copy the figures manually.'));
                       }}
                       variant="secondary"
                       className="border border-slate-700 bg-slate-800 hover:bg-slate-700 font-bold text-xs h-10 rounded-xl"
@@ -971,10 +1041,10 @@ export default function TradeAssistantPage() {
                   <div>
                     <h2 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
                       <Box className="w-5 h-5 text-[#FF5A00]" />
-                      <span>AI Product Sourcing & Verified Factory Matching</span>
+                      <span>Find Suppliers in the BulkSkart Directory</span>
                     </h2>
                     <p className="text-xs text-slate-300 mt-1">
-                      Our trade intelligence engine analyzes your technical specs, required volume, and compliance mandates to match top global manufacturers.
+                      Search the products suppliers have listed on BulkSkart. You get the suppliers whose listings match the words you type.
                     </p>
                   </div>
                   <Button
@@ -993,96 +1063,116 @@ export default function TradeAssistantPage() {
                     <Input
                       value={sourcingQuery}
                       onChange={(e) => setSourcingQuery(e.target.value)}
-                      placeholder="e.g. CNC horizontal milling machine with 5-axis controller..."
+                      placeholder="e.g. electric forklift, CNC milling machine, galvanized steel coil"
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleFindSuppliers(); }}
                       className="mt-1 bg-slate-950 border-slate-700 text-white text-xs"
                     />
                   </div>
                   <div className="sm:col-span-3">
                     <Label className="text-xs text-slate-300">Category</Label>
                     <select
-                      value={sourcingCategory}
-                      onChange={(e) => setSourcingCategory(e.target.value)}
+                      value={sourcingCategoryId}
+                      onChange={(e) => setSourcingCategoryId(e.target.value)}
                       className="w-full mt-1 bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs focus:border-[#FF5A00]"
                     >
-                      <option value="Machinery">Machinery & Industrial</option>
-                      <option value="Steel">Steel & Metals</option>
-                      <option value="Chemicals">Chemicals & Polymers</option>
-                      <option value="Textiles">Textiles & Apparel</option>
-                      <option value="Solar">Solar & Renewable</option>
+                      <option value="">All categories</option>
+                      {sourcingCategories.map((category) => (
+                        <option key={category.id} value={category.id}>{category.name}</option>
+                      ))}
                     </select>
                   </div>
                   <div className="sm:col-span-3 flex items-end">
                     <Button
-                      onClick={() => {
-                        toast.success('Matching verified suppliers from Bulkskart directory...');
-                      }}
+                      onClick={handleFindSuppliers}
+                      disabled={sourcingLoading}
                       className="w-full bg-gradient-to-r from-[#FF5A00] to-[#FF7700] hover:brightness-110 text-white font-bold text-xs h-9.5 rounded-xl"
                     >
                       <Sparkles className="w-3.5 h-3.5 mr-1.5" />
-                      <span>Find Suppliers</span>
+                      <span>{sourcingLoading ? 'Searching…' : 'Find Suppliers'}</span>
                     </Button>
                   </div>
                 </div>
 
-                {/* Recommended Verified Suppliers Cards */}
-                <div className="space-y-3 pt-2">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                    Recommended Verified Manufacturers ({sourcingResults.length} Matches Found)
-                  </h3>
+                {/* Matching suppliers (real listings only) */}
+                {sourcingSearched && (
+                  <div className="space-y-3 pt-2">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                      {sourcingResults.length > 0
+                        ? `Suppliers with matching listings (${sourcingResults.length})`
+                        : 'No matching listings yet'}
+                    </h3>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
-                    {sourcingResults.map((sup, idx) => (
-                      <div
-                        key={idx}
-                        className="rounded-xl bg-slate-950 border border-slate-800 p-4 space-y-3 hover:border-[#FF5A00]/60 transition-all flex flex-col justify-between"
-                      >
-                        <div>
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="w-8 h-8 rounded-lg bg-[#FF5A00]/20 text-[#FF5A00] flex items-center justify-center font-bold text-xs shrink-0">
-                              <Building2 className="w-4 h-4" />
-                            </div>
-                            {sup.verified && (
-                              <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/30 text-[10px]">
-                                Verified Factory
-                              </Badge>
-                            )}
-                          </div>
-
-                          <h4 className="text-sm font-bold text-white mt-2 leading-snug">
-                            {sup.name}
-                          </h4>
-                          <p className="text-xs text-slate-400 mt-0.5">
-                            📍 {sup.city}, {sup.country}
-                          </p>
-
-                          <div className="flex items-center gap-3 text-xs text-slate-300 mt-2">
-                            <span>⭐ {sup.rating} / 5.0</span>
-                            <span>•</span>
-                            <span>MOQ: {sup.moq}</span>
-                          </div>
-                        </div>
-
-                        <div className="pt-2 border-t border-slate-800 flex gap-2">
-                          <Button
-                            onClick={() => navigate('/manufacturers')}
-                            size="sm"
-                            className="flex-1 bg-[#FF5A00] hover:bg-[#e04e00] text-white text-xs font-bold h-8"
-                          >
-                            <span>Contact Factory</span>
-                          </Button>
-                          <Button
-                            onClick={() => navigate('/post-requirement')}
-                            size="sm"
-                            variant="secondary"
-                            className="border border-slate-700 text-xs h-8"
-                          >
-                            <span>Invite</span>
-                          </Button>
-                        </div>
+                    {sourcingResults.length === 0 ? (
+                      <div className="rounded-xl bg-slate-950 border border-slate-800 p-5 text-xs text-slate-300 space-y-3">
+                        <p>No supplier has listed a product that matches this search. Post an RFQ and suppliers can respond to you directly.</p>
+                        <Button
+                          onClick={() => navigate('/post-requirement')}
+                          size="sm"
+                          className="bg-[#FF5A00] hover:bg-[#e04e00] text-white text-xs font-bold h-8"
+                        >
+                          <span>Post Public RFQ</span>
+                        </Button>
                       </div>
-                    ))}
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+                        {sourcingResults.map((sup) => (
+                          <div
+                            key={sup.companyId}
+                            className="rounded-xl bg-slate-950 border border-slate-800 p-4 space-y-3 hover:border-[#FF5A00]/60 transition-all flex flex-col justify-between"
+                          >
+                            <div>
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="w-8 h-8 rounded-lg bg-[#FF5A00]/20 text-[#FF5A00] flex items-center justify-center font-bold text-xs shrink-0">
+                                  <Building2 className="w-4 h-4" />
+                                </div>
+                                {sup.verified && (
+                                  <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/30 text-[10px]">
+                                    Verified on BulkSkart
+                                  </Badge>
+                                )}
+                              </div>
+
+                              <h4 className="text-sm font-bold text-white mt-2 leading-snug">
+                                {sup.name}
+                              </h4>
+                              {sup.location && (
+                                <p className="text-xs text-slate-400 mt-0.5">
+                                  📍 {sup.location}
+                                </p>
+                              )}
+
+                              <ul className="mt-2 space-y-1 text-xs text-slate-300">
+                                {sup.products.slice(0, 2).map((product) => (
+                                  <li key={product.slug} className="truncate">
+                                    {product.name} <span className="text-slate-500">• MOQ {product.moq.toLocaleString()} {product.moqUnit}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+
+                            <div className="pt-2 border-t border-slate-800 flex gap-2">
+                              <Button
+                                onClick={() => navigate(sup.slug ? `/manufacturers/${sup.slug}` : '/manufacturers')}
+                                size="sm"
+                                className="flex-1 bg-[#FF5A00] hover:bg-[#e04e00] text-white text-xs font-bold h-8"
+                              >
+                                <span>View Supplier</span>
+                              </Button>
+                              <Button
+                                onClick={() => navigate('/post-requirement')}
+                                size="sm"
+                                variant="secondary"
+                                className="border border-slate-700 text-xs h-8"
+                              >
+                                <span>Post RFQ</span>
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                </div>
+                )}
               </div>
             </TabsContent>
 
@@ -1126,7 +1216,6 @@ export default function TradeAssistantPage() {
 
                       <div className="text-[11px] text-slate-400 pt-1 border-t border-slate-900 flex justify-between">
                         <span>Authority: <strong className="text-slate-300">{doc.authority}</strong></span>
-                        <span className="text-emerald-400 font-medium">Standard Validated</span>
                       </div>
                     </div>
                   ))}
@@ -1137,7 +1226,7 @@ export default function TradeAssistantPage() {
                   <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
                   <div>
                     <span className="font-bold text-white">Destination Regulatory Requirement: </span>
-                    Shipments entering {destCountry} must comply with local product safety certifications (e.g. BIS CRS for India, CE mark for EU, FDA prior notice for USA). Bulkskart's partner customs brokers provide pre-clearance file audits before vessel departure.
+                    Shipments entering {destCountry} must comply with local product safety certifications (e.g. BIS CRS for India, CE mark for EU, FDA prior notice for USA). Check the current rules with the destination customs authority or a licensed customs broker.
                   </div>
                 </div>
               </div>
@@ -1154,12 +1243,9 @@ export default function TradeAssistantPage() {
                       <Truck className="w-5 h-5 text-[#FF5A00]" />
                       <span>Formal Shipment Coordination Request</span>
                     </h2>
-                    <Badge variant="outline" className="border-emerald-500/30 text-emerald-400 bg-emerald-500/10 text-xs">
-                      Partner Dispatched
-                    </Badge>
                   </div>
                   <p className="text-xs text-slate-300 mt-1">
-                    Connect directly with verified freight forwarders and customs house agents for container bookings, multi-modal freight, and port clearance.
+                    Describe your shipment and send it to the BulkSkart team. Container bookings, freight and port clearance are carried out by shipping lines and licensed customs brokers.
                   </p>
                 </div>
 
@@ -1168,16 +1254,32 @@ export default function TradeAssistantPage() {
                     <div className="w-12 h-12 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto">
                       <CheckCircle2 className="w-6 h-6" />
                     </div>
-                    <h3 className="text-lg font-bold text-white">Shipment Request Dispatched!</h3>
+                    <h3 className="text-lg font-bold text-white">Your request is ready to send</h3>
                     <p className="text-xs text-slate-300 max-w-md mx-auto leading-relaxed">
-                      Your coordination dossier has been assigned reference ID <strong className="text-emerald-400 font-mono">{trackingNumber}</strong>. A dedicated logistics officer from our verified partner network will contact you within 4 business hours.
+                      This form is not saved on BulkSkart. Send it to the BulkSkart team on WhatsApp or by email and they will take it from there.
                     </p>
-                    <div className="pt-2">
+                    <pre className="text-left text-[11px] text-slate-300 bg-slate-950 border border-slate-800 rounded-xl p-3 whitespace-pre-wrap break-words max-w-md mx-auto">{coordMessage}</pre>
+                    <div className="pt-2 flex flex-wrap items-center justify-center gap-2">
+                      <a
+                        href={`${WHATSAPP_CHAT_URL}?text=${encodeURIComponent(coordMessage)}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center justify-center rounded-md bg-[#FF5A00] hover:bg-[#e04e00] text-white font-bold text-xs h-9 px-4"
+                      >
+                        Send on WhatsApp
+                      </a>
+                      <a
+                        href={`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('Shipment coordination request')}&body=${encodeURIComponent(coordMessage)}`}
+                        className="inline-flex items-center justify-center rounded-md border border-slate-700 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs h-9 px-4"
+                      >
+                        Send by email
+                      </a>
                       <Button
                         onClick={() => setCoordSubmitted(false)}
-                        className="bg-[#FF5A00] hover:bg-[#e04e00] text-white font-bold text-xs"
+                        variant="secondary"
+                        className="border border-slate-700 text-xs"
                       >
-                        Submit Another Shipment Request
+                        Edit request
                       </Button>
                     </div>
                   </div>
@@ -1258,8 +1360,8 @@ export default function TradeAssistantPage() {
                     <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 flex items-start gap-3 text-xs text-slate-300">
                       <ShieldCheck className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
                       <div>
-                        <span className="font-bold text-white">Partner Logistics Execution: </span>
-                        Physical shipping lines (Maersk, CMA CGM, Hapag-Lloyd) and licensed Customs Brokers handle physical freight carriage, customs clearance, and terminal delivery under official contract of carriage.
+                        <span className="font-bold text-white">Who carries the cargo: </span>
+                        Shipping lines and licensed customs brokers handle the physical freight carriage, customs clearance and terminal delivery under their own contracts. BulkSkart does not carry cargo itself.
                       </div>
                     </div>
 
@@ -1269,7 +1371,7 @@ export default function TradeAssistantPage() {
                         className="bg-gradient-to-r from-[#FF5A00] to-[#FF7700] hover:brightness-110 text-white font-bold text-xs px-6 py-5 rounded-xl shadow-lg shadow-orange-950/40"
                       >
                         <Send className="w-4 h-4 mr-2" />
-                        <span>Submit Shipment Coordination Request</span>
+                        <span>Prepare my request</span>
                       </Button>
                     </div>
                   </form>

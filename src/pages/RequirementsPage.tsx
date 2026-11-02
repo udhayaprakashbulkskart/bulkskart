@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import PageMeta from '@/components/common/PageMeta';
 import Breadcrumbs from '@/components/common/Breadcrumbs';
-import { getRequirements, getCategories, getOrCreateConversation, checkDirectMessageQuota, incrementMessageQuota } from '@/lib/api';
+import { getRequirements, getCategories, getOrCreateConversation, checkDirectMessageQuota, incrementMessageQuota, getRequirementsPage } from '@/lib/api';
 import type { Requirement, Category } from '@/types/types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/contexts/AuthContext';
@@ -23,10 +23,6 @@ import SupplierRespondDialog from '@/components/common/SupplierRespondDialog';
 import RequirementDetailDrawer from '@/components/common/RequirementDetailDrawer';
 import SafeImage from '@/components/common/SafeImage';
 import { getRequirementVisualInfo } from '@/lib/requirementVisuals';
-import {
-  TOTAL_SYSTEM_ACTIVE_RFQS,
-  queryLargeRequirementsCatalog,
-} from '@/lib/largeRequirementsDataset';
 
 const REFRESH_INTERVAL = 2 * 60 * 1000; // 2 minutes
 
@@ -191,9 +187,9 @@ export default function RequirementsPage() {
   const [selectedLocation, setSelectedLocation] = useState('all');
   const [selectedSort, setSelectedSort] = useState('latest');
   const [statusFilter, setStatusFilter] = useState<'all' | 'urgent' | 'new' | 'expiring' | 'live'>('all');
-  const [totalCount, setTotalCount] = useState(TOTAL_SYSTEM_ACTIVE_RFQS);
+  const [totalCount, setTotalCount] = useState(0);
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(Math.ceil(TOTAL_SYSTEM_ACTIVE_RFQS / 12));
+  const [totalPages, setTotalPages] = useState(1);
   const PAGE_SIZE = 12;
 
   // Dialog and drawer state
@@ -217,71 +213,26 @@ export default function RequirementsPage() {
     getCategories().then(setCategories);
   }, []);
 
-  // Fetch requirements with 50,000+ catalog querying & pagination
+  // Open requirements from the database, one page at a time
   const loadRequirements = useCallback(async () => {
     setLoading(true);
     try {
-      const catalogResult = queryLargeRequirementsCatalog({
+      const result = await getRequirementsPage({
         page,
         pageSize: PAGE_SIZE,
-        categoryId: selectedCat,
+        categorySlug: selectedCat,
         search,
         location: selectedLocation,
-        statusFilter,
       });
-
-      // Fetch real DB rows from Supabase database with strict deduplication
-      if (page === 1 && !search && selectedCat === 'all' && selectedLocation === 'all') {
-        try {
-          const dbData = await getRequirements({ status: 'active', limit: PAGE_SIZE });
-          if (dbData && dbData.length > 0) {
-            const seenIds = new Set<string>(dbData.map(d => d.id));
-            const seenReqNums = new Set<string>(dbData.map(d => d.req_number).filter(Boolean) as string[]);
-            const seenTitles = new Set<string>(dbData.map(d => (d.title || '').toLowerCase().trim()));
-
-            const filteredCatalog = catalogResult.data.filter(c => {
-              if (seenIds.has(c.id)) return false;
-              if (c.req_number && seenReqNums.has(c.req_number)) return false;
-              const normTitle = (c.title || '').toLowerCase().trim();
-              if (normTitle && seenTitles.has(normTitle)) return false;
-              seenIds.add(c.id);
-              if (c.req_number) seenReqNums.add(c.req_number);
-              if (normTitle) seenTitles.add(normTitle);
-              return true;
-            });
-
-            const combined = [...dbData, ...filteredCatalog].slice(0, PAGE_SIZE);
-            setRequirements(combined);
-            setTotalCount(catalogResult.totalCount);
-            setTotalPages(catalogResult.totalPages);
-            return;
-          }
-        } catch {
-          // fallback to catalog directly
-        }
-      }
-
-      // Deduplicate catalog results across page items
-      const seenPageIds = new Set<string>();
-      const seenPageTitles = new Set<string>();
-      const uniqueCatalog = catalogResult.data.filter(c => {
-        if (!c || !c.id || seenPageIds.has(c.id)) return false;
-        const normTitle = (c.title || '').toLowerCase().trim();
-        if (normTitle && seenPageTitles.has(normTitle)) return false;
-        seenPageIds.add(c.id);
-        if (normTitle) seenPageTitles.add(normTitle);
-        return true;
-      });
-
-      setRequirements(uniqueCatalog);
-      setTotalCount(catalogResult.totalCount);
-      setTotalPages(catalogResult.totalPages);
+      setRequirements(result.data);
+      setTotalCount(result.totalCount);
+      setTotalPages(result.totalPages);
     } catch (e) {
       console.error(e);
     } finally {
       setLoading(false);
     }
-  }, [page, search, selectedCat, selectedLocation, statusFilter]);
+  }, [page, search, selectedCat, selectedLocation]);
 
   useEffect(() => {
     loadRequirements();
@@ -509,34 +460,6 @@ export default function RequirementsPage() {
             </div>
           </div>
 
-          {/* ── Live Ticker Banner ────────────────────────────────────────── */}
-          <div className="mb-5 bg-card border border-border rounded-xl px-4 py-2 flex items-center justify-between gap-3 text-xs overflow-hidden">
-            <div className="flex items-center gap-2 shrink-0">
-              <span className="flex h-2 w-2 relative">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-              </span>
-              <span className="font-extrabold text-emerald-600 dark:text-emerald-400 text-[11px] uppercase tracking-wider">LIVE STREAM</span>
-              <span className="text-muted-foreground/40 hidden sm:inline">|</span>
-            </div>
-            <div className="overflow-x-auto no-scrollbar whitespace-nowrap text-muted-foreground text-xs flex items-center gap-6 flex-1 px-2">
-              <span className="inline-flex items-center gap-1.5 text-foreground">
-                <span className="text-[#FF5A00] font-bold">⚡ Live:</span> 50,000 Pcs A4 Paper inquiry just verified in Nairobi, Kenya
-              </span>
-              <span className="text-border">•</span>
-              <span className="inline-flex items-center gap-1.5">
-                <span className="text-emerald-600 dark:text-emerald-400 font-bold">New:</span> 25 MT HDPE Granules from Ahmedabad, Gujarat
-              </span>
-              <span className="text-border">•</span>
-              <span className="inline-flex items-center gap-1.5">
-                <span className="text-sky-600 dark:text-sky-400 font-bold">Urgent:</span> 100 MT Parboiled Rice 5% Broken required in Cotonou
-              </span>
-            </div>
-            <div className="text-[11px] text-muted-foreground/60 shrink-0 font-medium hidden md:block">
-              Auto-sync enabled
-            </div>
-          </div>
-
           {/* ── Tabs (Live Feed / My Requirements) ───────────────────────── */}
           <div className="flex items-center gap-2 mb-5">
             <button
@@ -676,14 +599,14 @@ export default function RequirementsPage() {
                   </div>
                 </div>
 
-                {/* Status Tabs with count chips reflecting 50,000+ Active Inquiries */}
+                {/* Status tabs. Only the total is a real database count. */}
                 <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
                   {[
                     { key: 'all', label: 'All', count: totalCount },
-                    { key: 'urgent', label: 'Urgent', count: Math.round(totalCount * 0.28), icon: Zap, iconClass: 'text-rose-500' },
-                    { key: 'new', label: 'New', count: Math.round(totalCount * 0.35), icon: Sparkles, iconClass: 'text-orange-500' },
-                    { key: 'expiring', label: 'Expiring', count: Math.round(totalCount * 0.15), icon: Clock, iconClass: 'text-amber-500' },
-                    { key: 'live', label: 'Live', count: Math.round(totalCount * 0.22), isLiveDot: true },
+                    { key: 'urgent', label: 'Urgent', count: undefined, icon: Zap, iconClass: 'text-rose-500' },
+                    { key: 'new', label: 'New', count: undefined, icon: Sparkles, iconClass: 'text-orange-500' },
+                    { key: 'expiring', label: 'Expiring', count: undefined, icon: Clock, iconClass: 'text-amber-500' },
+                    { key: 'live', label: 'Live', count: undefined, isLiveDot: true },
                   ].map(tab => {
                     const active = statusFilter === tab.key;
                     const Icon = tab.icon;
@@ -703,9 +626,11 @@ export default function RequirementsPage() {
                         )}
                         {Icon && <Icon className={`w-3 h-3 ${tab.iconClass}`} />}
                         <span>{tab.label}</span>
-                        <span className={`text-[11px] ${active ? 'text-white/90' : 'text-muted-foreground'}`}>
-                          ({tab.count.toLocaleString()})
-                        </span>
+                        {tab.count !== undefined && (
+                          <span className={`text-[11px] ${active ? 'text-white/90' : 'text-muted-foreground'}`}>
+                            ({tab.count.toLocaleString()})
+                          </span>
+                        )}
                       </button>
                     );
                   })}
@@ -835,12 +760,12 @@ export default function RequirementsPage() {
                 )}
               </div>
 
-              {/* ── 5.1 Pagination Bar for 50,000+ Real Buyer Posts ─────────── */}
+              {/* ── 5.1 Pagination bar ── */}
               {totalPages > 1 && (
                 <div className="bg-card border border-border rounded-2xl p-4 mb-16 flex flex-col sm:flex-row items-center justify-between gap-4">
                   <div className="text-xs text-muted-foreground">
                     Showing Page <strong className="text-foreground">{page}</strong> of{' '}
-                    <strong className="text-foreground">{totalPages.toLocaleString()}</strong> ({totalCount.toLocaleString()}+ Real Buyer Posts)
+                    <strong className="text-foreground">{totalPages.toLocaleString()}</strong> ({totalCount.toLocaleString()} requirements)
                   </div>
 
                   <div className="flex items-center gap-1.5">
@@ -914,11 +839,11 @@ export default function RequirementsPage() {
             </span>
             <div>
               <div className="text-xs md:text-sm font-black text-foreground leading-tight flex items-center gap-2">
-                <span><AnimatedCount target={totalCount} /> Active Real Requirements</span>
+                <span><AnimatedCount target={totalCount} /> Open requirements</span>
                 <span className="text-[10px] bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 px-1.5 py-0.2 rounded font-bold hidden sm:inline">100% Authentic Photos</span>
               </div>
               <div className="text-[10px] text-muted-foreground leading-tight">
-                50,000+ verified B2B procurement requests · Zero AI imagery
+                Requirements posted by buyers on BulkSkart
               </div>
             </div>
           </div>

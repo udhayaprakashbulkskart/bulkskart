@@ -26,7 +26,7 @@ export default function VerifiedSupplierQuickActions() {
     {
       id: 'mfr',
       title: 'Find a Manufacturer',
-      subtitle: 'Browse 1,200+ audited global plants',
+      subtitle: 'Browse verified manufacturers',
       icon: Factory,
       badge: 'Verified',
       badgeColor: 'bg-[#FF5A00]/15 text-[#FF5A00] border-[#FF5A00]/30',
@@ -37,7 +37,7 @@ export default function VerifiedSupplierQuickActions() {
     {
       id: 'product',
       title: 'Find a Product',
-      subtitle: '50,000+ bulk catalog items & raw materials',
+      subtitle: 'Bulk catalog items & raw materials',
       icon: Package,
       badge: 'Wholesale',
       badgeColor: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',

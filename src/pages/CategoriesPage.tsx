@@ -17,8 +17,6 @@ export interface CategoryCardData {
   slug: string;
   description: string;
   icon: any;
-  productCount: string;
-  manufacturerCount: string;
   heroImage: string;
   subcategories: string[];
 }
@@ -30,8 +28,6 @@ export const ALL_CATEGORIES_DATA: CategoryCardData[] = [
     slug: 'textiles-apparel',
     description: 'Cotton yarns, woven fabrics, denim, silk rolls, garments, and industrial technical textiles.',
     icon: Shirt,
-    productCount: '12,400+ Products',
-    manufacturerCount: '340+ Verified Mills',
     heroImage: 'https://cdn.pixabay.com/photo/2019/03/25/04/43/weaving-4079366_1280.jpg',
     subcategories: ['Cotton Yarn', 'Denim Fabric', 'Knitted Garments', 'Silk & Rayon', 'Industrial Filter Cloth', 'Polyester Blends'],
   },
@@ -41,8 +37,6 @@ export const ALL_CATEGORIES_DATA: CategoryCardData[] = [
     slug: 'construction-building',
     description: 'TMT rebar, structural beams, stainless steel pipes, sheets, billets, and construction hardware.',
     icon: Factory,
-    productCount: '8,900+ Products',
-    manufacturerCount: '280+ Steel Plants',
     heroImage: 'https://cdn.pixabay.com/photo/2016/11/29/09/32/welding-1868731_1280.jpg',
     subcategories: ['TMT Steel Bars', 'Hollow Sections', 'Stainless Steel Coils', 'Mild Steel Plates', 'Wire Rods', 'Pipes & Fittings'],
   },
@@ -52,8 +46,6 @@ export const ALL_CATEGORIES_DATA: CategoryCardData[] = [
     slug: 'machinery-industrial',
     description: 'CNC machine tools, electric motors, centrifugal pumps, diesel generators, and hydraulic presses.',
     icon: Cog,
-    productCount: '6,200+ Products',
-    manufacturerCount: '410+ Heavy Manufacturers',
     heroImage: 'https://cdn.pixabay.com/photo/2016/09/12/07/48/mechanical-1663275_1280.jpg',
     subcategories: ['CNC Lathes', 'Electric Motors', 'Industrial Pumps', 'Air Compressors', 'Hydraulic Systems', 'Conveyor Belts'],
   },
@@ -63,8 +55,6 @@ export const ALL_CATEGORIES_DATA: CategoryCardData[] = [
     slug: 'chemicals-raw-materials',
     description: 'Virgin polymers, HDPE, LDPE granules, PVC compound, masterbatches, and synthetic rubber.',
     icon: Layers,
-    productCount: '5,800+ Products',
-    manufacturerCount: '190+ Refineries & Compounders',
     heroImage: 'https://cdn.pixabay.com/photo/2017/10/04/21/01/turbine-engine-2817617_1280.jpg',
     subcategories: ['HDPE Granules', 'Polypropylene (PP)', 'PVC Resin', 'Color Masterbatches', 'Synthetic Rubber', 'Bio-Polymers'],
   },
@@ -74,8 +64,6 @@ export const ALL_CATEGORIES_DATA: CategoryCardData[] = [
     slug: 'chemicals-raw-materials',
     description: 'Bulk industrial solvents, specialty acids, pharmaceutical intermediates, and water treatment compounds.',
     icon: FlaskConical,
-    productCount: '4,100+ Products',
-    manufacturerCount: '160+ Chemical Plants',
     heroImage: 'https://cdn.pixabay.com/photo/2014/12/10/20/56/laboratory-563423_1280.jpg',
     subcategories: ['Ethanol & Solvents', 'Sulfuric & Nitric Acids', 'Caustic Soda Flakes', 'Dyes & Pigments', 'Water Treatment', 'Agro Chemicals'],
   },
@@ -85,8 +73,6 @@ export const ALL_CATEGORIES_DATA: CategoryCardData[] = [
     slug: 'packaging',
     description: '3-ply/5-ply corrugated cartons, kraft paper rolls, shipping crates, and flexible packaging pouches.',
     icon: Package,
-    productCount: '7,300+ Products',
-    manufacturerCount: '310+ Packaging Units',
     heroImage: 'https://cdn.pixabay.com/photo/2016/11/21/14/53/boxes-1845814_1280.jpg',
     subcategories: ['Corrugated Boxes', 'Kraft Paper Reels', 'Stretch Film Rolls', 'Printed Poly Pouches', 'Wooden Pallets', 'Bubble Wrap Rolls'],
   },
@@ -96,8 +82,6 @@ export const ALL_CATEGORIES_DATA: CategoryCardData[] = [
     slug: 'electronics-electrical',
     description: 'Copper cables, transformers, circuit breakers, solar inverters, and semiconductor modules.',
     icon: Sparkles,
-    productCount: '9,500+ Products',
-    manufacturerCount: '250+ Certified Factories',
     heroImage: 'https://cdn.pixabay.com/photo/2016/11/29/08/41/cable-1868478_1280.jpg',
     subcategories: ['Power Cables', 'Distribution Transformers', 'Solar PV Modules', 'Circuit Breakers', 'LED Industrial Lighting', 'Semiconductors'],
   },
@@ -107,8 +91,6 @@ export const ALL_CATEGORIES_DATA: CategoryCardData[] = [
     slug: 'agriculture-food',
     description: 'Non-basmati and basmati rice, refined sugar, whole spices, edible oils, pulses, and animal feed.',
     icon: Globe,
-    productCount: '11,200+ Products',
-    manufacturerCount: '480+ Agro Processors',
     heroImage: 'https://cdn.pixabay.com/photo/2016/09/10/11/42/wheat-1659021_1280.jpg',
     subcategories: ['Basmati Rice', 'Refined Sugar', 'Turmeric & Spices', 'Edible Soybean Oil', 'Wheat & Maize', 'Coffee Beans'],
   },
@@ -185,15 +167,6 @@ export default function CategoriesPage() {
                       <div className="w-9 h-9 rounded-xl bg-slate-900/90 border border-slate-700/80 flex items-center justify-center text-[#FF5A00]">
                         <Icon className="w-5 h-5" />
                       </div>
-                    </div>
-
-                    <div className="absolute bottom-3 left-4 right-4 flex items-center justify-between text-xs">
-                      <span className="font-bold text-[#FF5A00] bg-slate-950/80 px-2.5 py-1 rounded-full border border-[#FF5A00]/30">
-                        {cat.productCount}
-                      </span>
-                      <span className="text-slate-300 bg-slate-950/80 px-2.5 py-1 rounded-full border border-slate-800">
-                        {cat.manufacturerCount}
-                      </span>
                     </div>
                   </div>
 

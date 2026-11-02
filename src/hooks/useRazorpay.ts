@@ -9,6 +9,7 @@ import { useState, useCallback } from 'react';
 import { supabase } from '@/db/supabase';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
+import { BULKSKART_ICON_URL } from '@/constants/branding';
 
 export interface CheckoutOptions {
   plan_tier: string;       // 'starter' | 'business' | 'growth' | 'enterprise'
@@ -107,7 +108,7 @@ export function useRazorpay() {
         order_id,
         name: 'BulkSkart B2B Marketplace',
         description: `${opts.plan_label} Plan — ${opts.billing_cycle}`,
-        image: '/logo-mark.png',
+        image: BULKSKART_ICON_URL,
         prefill: {
           name: opts.user_name ?? '',
           email: opts.user_email ?? '',
@@ -225,7 +226,7 @@ export function useRazorpay() {
         order_id,
         name: 'BulkSkart B2B Marketplace',
         description: `${promoTypeTitle} — ${opts.duration_days} Days (${opts.product_name})`,
-        image: '/logo-mark.png',
+        image: BULKSKART_ICON_URL,
         prefill: {
           name: opts.user_name ?? '',
           email: opts.user_email ?? '',

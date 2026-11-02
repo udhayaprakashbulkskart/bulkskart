@@ -40,7 +40,6 @@ import { getMarketplaceProducts, getCategories, type MarketplaceProductFilterOpt
 import type { Product, Category } from '@/types/types';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { CURATED_INDUSTRIAL_PRODUCTS, type CuratedProduct } from '@/data/curatedIndustrialProducts';
 import { isGenericOrDuplicateImage } from '@/lib/productImageMatchingEngine';
 
 // Export DisplayProduct for compatibility with QuickQuoteModal and other components
@@ -219,33 +218,7 @@ function shuffleWithSeed<T>(items: T[], seed: number): T[] {
   return arr;
 }
 
-function curatedToDisplay(p: CuratedProduct): DisplayProduct {
-  return {
-    id: p.id,
-    name: p.name,
-    subtitle: p.subtitle,
-    slug: p.slug,
-    companyId: p.companyId,
-    supplierName: p.supplierName,
-    country: p.country,
-    countryFlag: p.countryFlag,
-    isVerifiedSupplier: p.isVerifiedSupplier,
-    moq: p.moq,
-    usdMin: p.usdMin,
-    usdMax: p.usdMax,
-    inrMin: p.inrMin,
-    inrMax: p.inrMax,
-    badgeType: p.badgeType,
-    badgeLabel: p.badgeLabel,
-    rating: p.rating,
-    reviewCount: p.reviewCount,
-    img: p.img,
-    categoryName: p.categoryName,
-    subCategory: p.categoryName,
-  };
-}
-
-/** Pick a unique rotating window from the curated + live pool */
+/** Pick a rotating window from the live product pool */
 function pickProductBatch(pool: DisplayProduct[], offset: number, count: number): DisplayProduct[] {
   if (pool.length === 0) return [];
   if (pool.length <= count) return pool;
@@ -325,14 +298,6 @@ function getAuthenticProductImage(productName: string, categorySlug: string, ori
   return pool[Math.abs(hash)];
 }
 
-// Instant first paint — visit-shuffled so every refresh shows a different batch
-function getInitialDisplayProducts(seed = createVisitSeed()): DisplayProduct[] {
-  const shuffled = shuffleWithSeed(
-    CURATED_INDUSTRIAL_PRODUCTS.map(curatedToDisplay),
-    seed
-  );
-  return pickProductBatch(shuffled, 0, LANDING_DISPLAY_COUNT);
-}
 
 export default function FeaturedProductsSection() {
   const navigate = useNavigate();
@@ -367,26 +332,20 @@ export default function FeaturedProductsSection() {
 
   // Visit seed → different product batch on every hard refresh
   const visitSeedRef = useRef<number>(createVisitSeed());
-  const [catalogPool, setCatalogPool] = useState<DisplayProduct[]>(() =>
-    shuffleWithSeed(CURATED_INDUSTRIAL_PRODUCTS.map(curatedToDisplay), visitSeedRef.current)
-  );
-  const [rotationOffset, setRotationOffset] = useState(
-    () => visitSeedRef.current % Math.max(1, CURATED_INDUSTRIAL_PRODUCTS.length)
-  );
+  const [catalogPool, setCatalogPool] = useState<DisplayProduct[]>([]);
+  const [rotationOffset, setRotationOffset] = useState(0);
   const rotationOffsetRef = useRef(rotationOffset);
   rotationOffsetRef.current = rotationOffset;
   const [secondsLeft, setSecondsLeft] = useState(ROTATION_SECONDS);
   const [isRotating, setIsRotating] = useState(false);
   const rotateAnimRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Pagination state initialized with instant curated catalog (0ms delay)
-  const [products, setProducts] = useState<DisplayProduct[]>(() =>
-    getInitialDisplayProducts(visitSeedRef.current)
-  );
-  const [totalCount, setTotalCount] = useState<number>(5355);
+  // Products come from the database only; nothing is shown until they load
+  const [products, setProducts] = useState<DisplayProduct[]>([]);
+  const [totalCount, setTotalCount] = useState<number>(0);
   const [page, setPage] = useState<number>(1);
   const [hasMore, setHasMore] = useState<boolean>(true);
-  const [loading, setLoading] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(true);
   const [loadingMore, setLoadingMore] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -571,25 +530,17 @@ export default function FeaturedProductsSection() {
         const comp = p.companies;
         const cat = p.categories;
         const pCountry = comp?.country || (p.export_destinations && p.export_destinations[0]) || 'India';
-        const rating = Number(comp?.rating_avg ?? (4.7 + ((index % 3) * 0.1)));
-        const reviewCount = Number(comp?.review_count ?? (120 + ((index * 37) % 450)));
+        const rating = Number(comp?.rating_avg ?? 0);
+        const reviewCount = Number(comp?.review_count ?? 0);
 
-        // Dynamic badges
+        // Badges mark only what the record says: a featured flag, or a listing added in the last 30 days
         let badgeType: DisplayProduct['badgeType'] = 'popular';
-        let badgeLabel = 'Popular';
-
-        if (index % 4 === 0) {
-          badgeType = 'best_seller';
-          badgeLabel = 'Best Seller';
-        } else if (index % 4 === 1) {
-          badgeType = 'bulk_deal';
-          badgeLabel = 'Bulk Deal';
-        } else if (index % 4 === 2) {
+        let badgeLabel = '';
+        if (p.is_featured) {
+          badgeLabel = 'Featured';
+        } else if (p.created_at && Date.now() - new Date(p.created_at).getTime() < 30 * 86_400_000) {
           badgeType = 'new_arrival';
-          badgeLabel = 'New Arrival';
-        } else if (index % 4 === 3) {
-          badgeType = 'trending';
-          badgeLabel = 'Trending';
+          badgeLabel = 'New';
         }
 
         const rawImg = Array.isArray(p.images) && p.images[0] ? p.images[0] : '';
@@ -602,17 +553,17 @@ export default function FeaturedProductsSection() {
           slug: p.slug,
           companyId: p.company_id || comp?.id,
           supplierOwnerId: comp?.owner_id,
-          moq: `MOQ: ${p.moq || 100} ${p.moq_unit || 'Pcs'}`,
-          usdMin: p.price_min ?? 25,
-          usdMax: p.price_max ?? 45,
-          inrMin: (p.price_min ?? 25) * 83.5,
-          inrMax: (p.price_max ?? 45) * 83.5,
+          moq: p.moq ? `MOQ: ${p.moq} ${p.moq_unit || ''}`.trim() : 'MOQ on request',
+          usdMin: p.price_min ?? 0,
+          usdMax: p.price_max ?? 0,
+          inrMin: (p.price_min ?? 0) * 83.5,
+          inrMax: (p.price_max ?? 0) * 83.5,
           badgeType,
           badgeLabel,
           rating,
           reviewCount,
-          isVerifiedSupplier: comp?.verification_status === 'verified' || true,
-          supplierName: comp?.company_name || 'Verified Export Manufacturer',
+          isVerifiedSupplier: comp?.verification_status === 'verified',
+          supplierName: comp?.company_name || 'Supplier',
           country: pCountry,
           countryFlag: COUNTRY_FLAGS[pCountry] || '🌐',
           img: authenticImg,
@@ -620,52 +571,6 @@ export default function FeaturedProductsSection() {
           categoryName: cat?.name,
         };
       });
-
-      // Enrich with curated Alibaba-style samples so the landing grid stays dense & professional
-      if (formatted.length < LANDING_CATALOG_MIN) {
-        const seenNames = new Set(formatted.map(p => p.name.toLowerCase()));
-        
-        // Priority 1: Match category if selected
-        const matchingCategory = CURATED_INDUSTRIAL_PRODUCTS.filter(p => {
-          if (seenNames.has(p.name.toLowerCase())) return false;
-          if (selectedCategory === 'all') return true;
-          return p.categorySlug.toLowerCase().includes(selectedCategory.toLowerCase()) ||
-                 selectedCategory.toLowerCase().includes(p.categorySlug.toLowerCase());
-        });
-
-        // Priority 2: Other curated industrial items
-        const otherCurated = CURATED_INDUSTRIAL_PRODUCTS.filter(p => {
-          return !seenNames.has(p.name.toLowerCase()) && !matchingCategory.some(m => m.id === p.id);
-        });
-
-        const pool = [...matchingCategory, ...otherCurated];
-        for (const item of pool) {
-          if (formatted.length >= LANDING_CATALOG_MIN) break;
-          seenNames.add(item.name.toLowerCase());
-          formatted.push({
-            id: item.id,
-            name: item.name,
-            subtitle: item.subtitle,
-            slug: item.slug,
-            companyId: item.companyId,
-            moq: item.moq,
-            usdMin: item.usdMin,
-            usdMax: item.usdMax,
-            inrMin: item.inrMin,
-            inrMax: item.inrMax,
-            badgeType: item.badgeType,
-            badgeLabel: item.badgeLabel,
-            rating: item.rating,
-            reviewCount: item.reviewCount,
-            isVerifiedSupplier: item.isVerifiedSupplier,
-            supplierName: item.supplierName,
-            country: item.country,
-            countryFlag: item.countryFlag,
-            img: item.img,
-            categoryName: item.categoryName,
-          });
-        }
-      }
 
       const dedupe = (list: DisplayProduct[]) => {
         const map = new Map<string, DisplayProduct>();
@@ -679,8 +584,8 @@ export default function FeaturedProductsSection() {
         setProducts(prev => dedupe([...prev, ...formatted]));
       } else {
         const unique = dedupe(formatted);
-        // Default featured rail: merge live DB + curated into a rotation pool,
-        // then show a visit-seeded window (changes every refresh + every 30s).
+        // Default featured rail: a rotation pool of the live products,
+        // then a visit-seeded window (changes every refresh + every 30s).
         const browsingDefault =
           selectedCategory === 'all' &&
           selectedSubCategory === 'all' &&
@@ -694,10 +599,7 @@ export default function FeaturedProductsSection() {
           targetPage === 1;
 
         if (browsingDefault) {
-          const merged = dedupe([
-            ...unique,
-            ...CURATED_INDUSTRIAL_PRODUCTS.map(curatedToDisplay),
-          ]);
+          const merged = dedupe([...unique]);
           const shuffled = shuffleWithSeed(merged, visitSeedRef.current ^ (Date.now() & 0xffff));
           setCatalogPool(shuffled);
           setProducts(pickProductBatch(shuffled, rotationOffsetRef.current, LANDING_DISPLAY_COUNT));
@@ -705,7 +607,7 @@ export default function FeaturedProductsSection() {
           setProducts(unique);
         }
       }
-      setTotalCount(res.totalCount > 0 ? res.totalCount : 5355);
+      setTotalCount(res.totalCount);
       setHasMore(res.hasMore);
       setPage(targetPage);
     } catch (err) {
@@ -926,7 +828,7 @@ export default function FeaturedProductsSection() {
                 type="text"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                placeholder="Search 5,000+ products (e.g. Solar panels, Cotton, CNC, Food truck)..."
+                placeholder="Search products (e.g. Solar panels, Cotton, CNC, Food truck)..."
                 className="pl-9 pr-8 h-9 text-xs sm:text-sm bg-background border-border text-foreground placeholder:text-muted-foreground rounded-lg focus-visible:ring-1 focus-visible:ring-[#FF5A00] focus-visible:border-[#FF5A00]"
               />
               {searchQuery && (
@@ -1278,9 +1180,11 @@ export default function FeaturedProductsSection() {
                             className="w-full h-full object-cover"
                             sizes="165px"
                           />
-                          <span className="absolute top-1 left-1 bg-[#FF5A00] text-white text-[8.5px] font-bold px-1.5 py-0.2 rounded shadow">
-                            {product.badgeLabel}
-                          </span>
+                          {product.badgeLabel && (
+                            <span className="absolute top-1 left-1 bg-[#FF5A00] text-white text-[8.5px] font-bold px-1.5 py-0.2 rounded shadow">
+                              {product.badgeLabel}
+                            </span>
+                          )}
                         </div>
                         <div className="p-2 flex-1 flex flex-col justify-between">
                           <Link to={product.slug ? `/products/${product.slug}` : `/products/${product.id}`}>
@@ -1345,7 +1249,8 @@ export default function FeaturedProductsSection() {
                     <div className="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-black/25 to-transparent pointer-events-none" />
 
                     {/* Top-Left Dynamic Badge */}
-                    <div className="absolute top-1.5 left-1.5 z-10">
+                    {product.badgeLabel && (
+<div className="absolute top-1.5 left-1.5 z-10">
                       <span className={`inline-flex items-center gap-1 text-[9px] sm:text-[10px] font-bold px-1.5 py-0.5 rounded shadow ${
                         product.badgeType === 'best_seller'
                           ? 'bg-amber-500 text-black'
@@ -1362,6 +1267,7 @@ export default function FeaturedProductsSection() {
                         <span>{product.badgeLabel}</span>
                       </span>
                     </div>
+)}
 
                     {/* Top-Right Wishlist Button */}
                     <button
@@ -1412,6 +1318,9 @@ export default function FeaturedProductsSection() {
                           countryConfig.currency === 'INR' ||
                           currencyInfo.currency === 'INR';
                         const inrRate = currencyInfo.rate || 83.5;
+                        if (!product.usdMin && !product.inrMin) {
+                          return <div className="text-muted-foreground font-semibold text-xs">Price on request</div>;
+                        }
                         const minFormatted = isIndia
                           ? `₹${Math.round(product.inrMin || (product.usdMin * inrRate)).toLocaleString('en-IN')}`
                           : formatPrice(product.usdMin);
@@ -1450,11 +1359,13 @@ export default function FeaturedProductsSection() {
 
                       <div className="flex items-center justify-between text-[10px] text-muted-foreground mt-0.5">
                         {/* Rating */}
+                        {product.reviewCount > 0 ? (
                         <div className="flex items-center gap-0.5 text-amber-500 font-semibold">
                           <Star className="w-2.5 h-2.5 fill-amber-500" />
                           <span>{product.rating.toFixed(1)}</span>
                           <span className="text-muted-foreground">({product.reviewCount})</span>
                         </div>
+                        ) : <span />}
 
                         {/* Verified badge */}
                         {product.isVerifiedSupplier && (

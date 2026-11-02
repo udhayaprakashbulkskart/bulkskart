@@ -11,7 +11,6 @@ import {
   DialogFooter
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { getUniqueLeadContact } from '@/lib/uniqueLeadContact';
 
 interface ProtectedContactProps {
   /** Phone number to protect (buyer contact, bidder phone, etc.) */
@@ -44,6 +43,13 @@ interface ProtectedContactProps {
   seed?: string | null;
 }
 
+/** "+91 98201 88921" becomes "+91 ••••• •••••": the dial code stays, the number does not. */
+function maskPhone(raw: string): string {
+  const trimmed = raw.trim();
+  const dial = trimmed.match(/^\+\d{1,3}/)?.[0] ?? '';
+  return `${dial}${trimmed.slice(dial.length).replace(/\d/g, '•')}`;
+}
+
 export default function ProtectedContact({
   phone,
   name,
@@ -55,24 +61,15 @@ export default function ProtectedContact({
   className = '',
   isPostOwner = false,
   allowPaidSupplierUnlock = false,
-  seed = null,
 }: ProtectedContactProps) {
   const { user, profile, isPaidSubscriber } = useAuth();
   const [modalOpen, setModalOpen] = useState(false);
   const [nonOwnerModalOpen, setNonOwnerModalOpen] = useState(false);
 
-  const unique = getUniqueLeadContact({
-    seed: seed || phone || name || email || country || 'contact',
-    country,
-    phone,
-  });
-
-  const rawPhone = (phone && String(phone).trim()) || unique.phone;
-  const cleanDigits = unique.e164Digits || rawPhone.replace(/\D/g, '');
-  const displayPhone = (phone && String(phone).trim()) || unique.phone;
-
-  // Unique per-card mask (dial code + prefix vary by seed / country)
-  const maskedDisplay = unique.maskedPhone;
+  // Only a number that exists in the database is ever shown. Nothing is generated.
+  const displayPhone = (phone && String(phone).trim()) || '';
+  const cleanDigits = displayPhone.replace(/\D/g, '');
+  const maskedDisplay = maskPhone(displayPhone);
 
   // Access:
   // - Post owner with paid sub can always unlock
@@ -82,6 +79,8 @@ export default function ProtectedContact({
   const canUnlockAsPaidSupplier = Boolean(allowPaidSupplierUnlock && isSupplier && isPaidSubscriber);
   const canView = Boolean((isPostOwner && isPaidSubscriber) || canUnlockAsPaidSupplier);
   const showSubscribeCta = Boolean(isPostOwner || (allowPaidSupplierUnlock && isSupplier));
+
+  if (!displayPhone) return null;
 
   const contactLabel = contactType === 'bidder' 
     ? 'Bidding Contact Number' 

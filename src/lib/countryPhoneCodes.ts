@@ -206,72 +206,12 @@ export function getCountryGuestMask(country?: string | null): string {
 }
 
 /**
- * Generate a deterministic authentic phone number for a company matching its country
+ * The phone number a supplier actually stored on their company profile, or null when they have not
+ * stored one. Numbers are never generated: a made-up number would send a buyer to a stranger.
  */
 export function getCompanyDisplayPhone(company?: {
-  country?: string | null;
   contact_phone?: string | null;
-  slug?: string;
-  id?: string;
-} | null): string {
-  if (!company) return '+91 98765 43210';
-
-  const country = company.country?.trim() || 'India';
-  const meta = getCountryMeta(country);
-  const raw = company.contact_phone?.trim();
-
-  // If company has an explicit contact phone that already matches its country dial code, use it
-  if (raw && raw.startsWith(meta.dialCode)) {
-    return raw;
-  }
-
-  // Generate deterministic authentic phone digits based on slug/id
-  const seedString = company.slug || company.id || 'bulkskart-supplier';
-  let hash = 0;
-  for (let i = 0; i < seedString.length; i++) {
-    hash = (hash * 31 + seedString.charCodeAt(i)) >>> 0;
-  }
-
-  const partA = String(100 + (hash % 899));
-  const partB = String(1000 + ((hash >>> 3) % 8999));
-  const partC = String(1000 + ((hash >>> 7) % 8999));
-
-  const countryKey = country.toLowerCase();
-
-  switch (countryKey) {
-    case 'uae':
-    case 'united arab emirates':
-    case 'dubai':
-      return `+971 4 ${partA.slice(0, 3)} ${partB}`;
-    case 'germany':
-      return `+49 89 ${partA} ${partC.slice(0, 4)}`;
-    case 'japan':
-      return `+81 3 ${partB.slice(0, 4)} ${partC.slice(0, 4)}`;
-    case 'usa':
-    case 'united states':
-      return `+1 415 ${partA} ${partB}`;
-    case 'uk':
-    case 'united kingdom':
-      return `+44 20 ${partB.slice(0, 4)} ${partC.slice(0, 4)}`;
-    case 'vietnam':
-      return `+84 28 ${partB.slice(0, 4)} ${partC.slice(0, 4)}`;
-    case 'turkey':
-      return `+90 212 ${partA} ${partB}`;
-    case 'south korea':
-    case 'korea':
-      return `+82 2 ${partB.slice(0, 4)} ${partC.slice(0, 4)}`;
-    case 'italy':
-      return `+39 02 ${partB.slice(0, 4)} ${partC.slice(0, 4)}`;
-    case 'china':
-      return `+86 571 ${partB.slice(0, 4)} ${partC.slice(0, 4)}`;
-    case 'singapore':
-      return `+65 67${partB.slice(0, 2)} ${partC.slice(0, 4)}`;
-    case 'france':
-      return `+33 1 42 ${partA.slice(0, 2)} ${partB.slice(0, 2)} ${partC.slice(0, 2)}`;
-    case 'australia':
-      return `+61 2 ${partB.slice(0, 4)} ${partC.slice(0, 4)}`;
-    case 'india':
-    default:
-      return `+91 98${partA.slice(0, 3)} ${partB.slice(0, 5)}`;
-  }
+} | null): string | null {
+  const raw = company?.contact_phone?.trim();
+  return raw ? raw : null;
 }

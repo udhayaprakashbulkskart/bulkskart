@@ -13,7 +13,7 @@ import {
   Building2, Globe, MessageSquare,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { WHATSAPP_CHAT_URL, WHATSAPP_DISPLAY, WHATSAPP_MESSAGE_URL } from '@/lib/supportContact';
+import { SUPPORT_EMAIL, WHATSAPP_CHAT_URL, WHATSAPP_DISPLAY, WHATSAPP_MESSAGE_URL } from '@/lib/supportContact';
 
 const CONTACT_INFO = [
   {
@@ -73,20 +73,20 @@ const FAQS = [
 export default function ContactPage() {
   const [form, setForm] = useState({ name: '', email: '', subject: '', message: '' });
   const [sent, setSent] = useState(false);
-  const [sending, setSending] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // This form is not stored anywhere. It prepares the message, and the visitor sends it from their email app or WhatsApp.
+  const subject = form.subject.trim() || 'Enquiry from bulkskart.com';
+  const body = `${form.message.trim()}\n\n${form.name.trim()} (${form.email.trim()})`;
+  const mailtoHref = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  const whatsappHref = `${WHATSAPP_CHAT_URL}?text=${encodeURIComponent(`${subject}\n\n${body}`)}`;
+
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name || !form.email || !form.message) {
       toast.error('Please fill in all required fields');
       return;
     }
-    setSending(true);
-    // Simulate send — replace with real Edge Function call if needed
-    await new Promise(r => setTimeout(r, 1200));
-    setSending(false);
     setSent(true);
-    toast.success('Message sent! We\'ll get back to you within 24 hours.');
   };
 
   return (
@@ -124,15 +124,23 @@ export default function ContactPage() {
           {/* Contact form */}
           <div>
             <h2 className="text-xl font-bold text-foreground mb-1">Send Us a Message</h2>
-            <p className="text-sm text-muted-foreground mb-5">Fill in the form and we'll respond within 24 hours.</p>
+            <p className="text-sm text-muted-foreground mb-5">Fill in the form, then send it from your email app or WhatsApp.</p>
 
             {sent ? (
-              <div className="flex flex-col items-center justify-center py-16 gap-4 bg-green-50 border border-green-200 rounded-xl text-center">
+              <div className="flex flex-col items-center justify-center py-12 px-4 gap-4 bg-green-50 border border-green-200 rounded-xl text-center">
                 <CheckCircle2 className="w-12 h-12 text-green-500" />
-                <h3 className="text-lg font-bold text-foreground">Message Sent!</h3>
-                <p className="text-sm text-muted-foreground max-w-xs">Thank you for reaching out. Our team will get back to you within 24 hours.</p>
-                <Button variant="outline" onClick={() => { setSent(false); setForm({ name: '', email: '', subject: '', message: '' }); }}>
-                  Send Another
+                <h3 className="text-lg font-bold text-foreground">Your message is ready to send</h3>
+                <p className="text-sm text-muted-foreground max-w-xs">This form does not send your message by itself. Send it from your email app or on WhatsApp so it reaches the BulkSkart team.</p>
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  <a href={mailtoHref} className="inline-flex items-center justify-center gap-2 rounded-md bg-[#FF5A00] hover:bg-[#e04e00] text-white font-bold text-sm h-10 px-4">
+                    <Mail className="w-4 h-4" /> Send by email
+                  </a>
+                  <a href={whatsappHref} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-2 rounded-md border border-border bg-card hover:bg-muted text-foreground font-bold text-sm h-10 px-4">
+                    <MessageSquare className="w-4 h-4" /> Send on WhatsApp
+                  </a>
+                </div>
+                <Button variant="ghost" onClick={() => setSent(false)}>
+                  Edit message
                 </Button>
               </div>
             ) : (
@@ -162,12 +170,8 @@ export default function ContactPage() {
                     required
                   />
                 </div>
-                <Button type="submit" disabled={sending} className="w-full bg-[#FF5A00] hover:bg-[#e04e00] text-white font-bold h-11 gap-2">
-                  {sending ? (
-                    <span className="flex items-center gap-2"><Send className="w-4 h-4 animate-pulse" /> Sending...</span>
-                  ) : (
-                    <><Send className="w-4 h-4" /> Send Message</>
-                  )}
+                <Button type="submit" className="w-full bg-[#FF5A00] hover:bg-[#e04e00] text-white font-bold h-11 gap-2">
+                  <Send className="w-4 h-4" /> Prepare Message
                 </Button>
               </form>
             )}

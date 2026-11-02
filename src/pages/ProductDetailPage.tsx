@@ -29,7 +29,7 @@ import { useCountry } from '@/contexts/CurrencyContext';
 import PageMeta from '@/components/common/PageMeta';
 import Breadcrumbs from '@/components/common/Breadcrumbs';
 import MaskedPhone from '@/components/common/MaskedPhone';
-import { getCompanyDisplayPhone, getCountryTimezone } from '@/lib/countryPhoneCodes';
+import { getCompanyDisplayPhone } from '@/lib/countryPhoneCodes';
 import BulkPriceCalculator from '@/components/common/BulkPriceCalculator';
 import SampleRequestDialog from '@/components/common/SampleRequestDialog';
 import InstantQuoteDialog from '@/components/common/InstantQuoteDialog';
@@ -147,6 +147,11 @@ export default function ProductDetailPage() {
   if (loading) return <Skeleton />;
   if (!product) return (
     <MainLayout>
+      <PageMeta
+        title="Product Not Found | BulkSkart"
+        description="The requested product listing does not exist or may have been removed."
+        robots="noindex, nofollow"
+      />
       <div className="max-w-md mx-auto text-center py-24 px-4 space-y-4">
         <Package className="w-12 h-12 text-[#FF5A00] mx-auto opacity-80" />
         <h2 className="text-xl font-bold text-foreground">Product Not Found</h2>
@@ -260,9 +265,6 @@ export default function ProductDetailPage() {
                 showIcon={false}
                 className="justify-center text-base font-mono font-black tracking-widest text-primary"
               />
-              <p className="text-xs text-muted-foreground mt-2">
-                Business hours: 9 AM – 6 PM {getCountryTimezone(product.companies?.country)}
-              </p>
             </div>
           </div>
           <div className="flex gap-3 mt-4">

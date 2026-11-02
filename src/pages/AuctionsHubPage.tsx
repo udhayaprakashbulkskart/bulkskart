@@ -13,11 +13,6 @@ import SafeImage from '@/components/common/SafeImage';
 import { supabase } from '@/db/supabase';
 import { toast } from 'sonner';
 import CreateReverseAuctionDialog from '@/components/auctions/CreateReverseAuctionDialog';
-import {
-  getSimulatedAuctions,
-  mergeWithSimulatedAuctions,
-  type SimulatedAuctionItem,
-} from '@/data/simulatedLiveAuctions';
 import { assignDistinctAuctionImages, resolveAuctionImage } from '@/lib/auctionImageResolver';
 
 interface AuctionItem {
@@ -70,15 +65,6 @@ export default function AuctionsHubPage() {
   useEffect(() => {
     let isMounted = true;
 
-    function seedSimBoard() {
-      const sims = assignDistinctAuctionImages(getSimulatedAuctions() as AuctionItem[]) as AuctionItem[];
-      setAllAuctions(sims);
-      setTimeRemainings(applyTimers(sims));
-    }
-
-    // Instant presence while DB loads
-    seedSimBoard();
-
     async function loadDbAuctions() {
       try {
         const { data, error } = await supabase
@@ -112,37 +98,25 @@ export default function AuctionsHubPage() {
             status: d.status || 'live',
             delivery_location: d.delivery_location || 'Pan-India',
             images: [img],
-            manufacturer_name: 'Verified Manufacturer',
+            manufacturer_name: d.manufacturer_name || undefined,
           };
         });
 
-        const merged = assignDistinctAuctionImages(
-          mergeWithSimulatedAuctions(mapped) as AuctionItem[]
-        ) as AuctionItem[];
+        const merged = assignDistinctAuctionImages(mapped as AuctionItem[]) as AuctionItem[];
         setAllAuctions(merged);
         setTimeRemainings(applyTimers(merged));
       } catch {
-        if (isMounted) seedSimBoard();
+        if (isMounted) {
+          setAllAuctions([]);
+          setTimeRemainings({});
+        }
       }
     }
 
     loadDbAuctions();
 
-    // Refresh simulated bids / rolling end times every 8s without hitting the DB
-    const activity = setInterval(() => {
-      if (!isMounted) return;
-      setAllAuctions((prev) => {
-        const real = prev.filter((a) => !a.is_simulated);
-        const sims = getSimulatedAuctions() as AuctionItem[];
-        const next = [...real, ...sims];
-        setTimeRemainings(applyTimers(next));
-        return next;
-      });
-    }, 8000);
-
     return () => {
       isMounted = false;
-      clearInterval(activity);
     };
   }, []);
 
@@ -391,11 +365,6 @@ export default function AuctionsHubPage() {
                         <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-red-600 text-white flex items-center gap-1 shadow-md">
                           <span className="w-2 h-2 rounded-full bg-white animate-ping" />
                           LIVE 60-MIN
-                        </span>
-                      )}
-                      {(auc as AuctionItem | SimulatedAuctionItem).is_simulated && (
-                        <span className="px-2 py-1 rounded-lg text-[10px] font-bold bg-slate-700/90 text-slate-200 backdrop-blur-sm">
-                          SAMPLE
                         </span>
                       )}
                       <span className="px-2 py-1 rounded-lg text-[10px] font-mono font-bold bg-black/75 text-white backdrop-blur-sm">

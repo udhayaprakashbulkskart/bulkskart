@@ -12,13 +12,13 @@ import {
 } from 'lucide-react';
 import SafeImage from '@/components/common/SafeImage';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { getCompanies, getOrCreateConversation, checkDirectMessageQuota, incrementMessageQuota } from '@/lib/api';
-import { TOTAL_VERIFIED_SUPPLIERS_COUNT } from '@/data/alibabaVerifiedSuppliers';
-import type { Company } from '@/types/types';
+import { getCompanies, getOrCreateConversation, checkDirectMessageQuota, incrementMessageQuota, getRequirements, sendMessage } from '@/lib/api';
+import type { Company, Requirement } from '@/types/types';
 import { useAuth } from '@/contexts/AuthContext';
 import SubscribeToContactDialog from '@/components/common/SubscribeToContactDialog';
 import { toast } from 'sonner';
 import { resolveCompanyBranding } from '@/lib/contentImages';
+import { INCLUDE_TEMPLATE_SEED_DATA, SEED_OWNER_ID } from '@/lib/seedData';
 
 // ── Static fallback assets: 12 completely distinct industrial factory, cleanroom, and plant photos ──
 const FALLBACK_IMGS = [
@@ -350,7 +350,7 @@ export default function ManufacturersPage() {
   const [selectedMoq, setSelectedMoq] = useState('all');
   const [selectedCert, setSelectedCert] = useState('all');
   const [sortBy, setSortBy] = useState('newest');
-  const [totalCount, setTotalCount] = useState(TOTAL_VERIFIED_SUPPLIERS_COUNT + 76);
+  const [totalCount, setTotalCount] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 24;
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -376,32 +376,59 @@ export default function ManufacturersPage() {
     });
   };
 
-  // RFQ Invitation Dialog state
+  // RFQ Invitation Dialog state: the invitation goes to the supplier's BulkSkart inbox as a real message
+  // that links to one of the buyer's own active requirements.
   const [inviteTargetCo, setInviteTargetCo] = useState<Company | null>(null);
-  const [inviteRfqId, setInviteRfqId] = useState('BS-RFQ-1042');
+  const [inviteRfqs, setInviteRfqs] = useState<Requirement[] | null>(null);
+  const [inviteRfqId, setInviteRfqId] = useState('');
   const [inviteMessage, setInviteMessage] = useState('We would like to invite your factory to submit a quotation for our bulk requirement.');
   const [isSendingInvite, setIsSendingInvite] = useState(false);
 
-  const handleSendInvite = () => {
-    if (!inviteTargetCo) return;
+  const handleOpenInvite = async (target: Company) => {
+    if (!user || !profile) { setDialogReason('not_logged_in'); setDialogOpen(true); return; }
+    if (profile.role !== 'buyer') {
+      toast.info('Only buyer accounts can invite a supplier to an RFQ. Post a requirement from a buyer account first.');
+      return;
+    }
+    setInviteTargetCo(target);
+    setInviteRfqs(null);
+    setInviteRfqId('');
+    const rfqs = await getRequirements({ buyerId: user.id, status: 'active', limit: 50 });
+    setInviteRfqs(rfqs);
+    setInviteRfqId(rfqs[0]?.id ?? '');
+  };
+
+  const handleSendInvite = async () => {
+    if (!inviteTargetCo || !user) return;
+    const rfq = inviteRfqs?.find((r) => r.id === inviteRfqId);
+    if (!rfq) { toast.error('Choose one of your active requirements first.'); return; }
     setIsSendingInvite(true);
-    setTimeout(() => {
+    const { id: convId, error } = await getOrCreateConversation(user.id, inviteTargetCo.owner_id, inviteTargetCo.id, rfq.id);
+    if (error || !convId) {
       setIsSendingInvite(false);
-      toast.success(`RFQ Invitation sent to ${inviteTargetCo.company_name}!`, {
-        description: `They will receive requirement ${inviteRfqId} and notify you upon submitting quotation.`
-      });
-      setInviteTargetCo(null);
-    }, 600);
+      toast.error('We could not reach this supplier. Please try again.');
+      return;
+    }
+    const text = `${inviteMessage.trim()}\n\nRequirement: ${rfq.title}${rfq.req_number ? ` (${rfq.req_number})` : ''}\n${window.location.origin}/requirement/${rfq.id}`;
+    const { error: sendError } = await sendMessage(convId, text);
+    setIsSendingInvite(false);
+    if (sendError) {
+      toast.error('Your invitation could not be delivered. Please try again.');
+      return;
+    }
+    toast.success(`Invitation sent to ${inviteTargetCo.company_name}.`, {
+      description: 'It is in their BulkSkart inbox, with a link to your requirement.',
+    });
+    setInviteTargetCo(null);
   };
 
   // count
   useEffect(() => {
     import('@/db/supabase').then(({ supabase }) => {
-      supabase.from('companies').select('id', { count: 'exact', head: true })
-        .then(({ count }) => {
-          const dbC = count ?? 0;
-          setTotalCount(TOTAL_VERIFIED_SUPPLIERS_COUNT + dbC);
-        });
+      let query = supabase.from('companies').select('id', { count: 'exact', head: true });
+      // the template's demo companies are not suppliers
+      if (!INCLUDE_TEMPLATE_SEED_DATA) query = query.neq('owner_id', SEED_OWNER_ID);
+      query.then(({ count }) => setTotalCount(count ?? 0));
     });
   }, []);
 
@@ -484,7 +511,7 @@ export default function ManufacturersPage() {
     <MainLayout>
       <PageMeta
         title="Verified Global Manufacturers & Wholesale Exporters Directory | BulkSkart"
-        description="Search over 1,000+ verified factories, exporters, and OEM/ODM manufacturers across India, USA, UAE, Germany, Vietnam, and global manufacturing hubs. Filter by certifications (ISO, CE, FDA, GMP) and connect directly."
+        description="Browse verified factories, exporters, and OEM/ODM manufacturers on BulkSkart. Filter by country, certification and business type, and connect directly."
         keywords="verified manufacturers directory, global exporters directory, bulk suppliers, B2B wholesale factories, OEM ODM manufacturers, ISO certified suppliers India"
         canonical="/manufacturers"
         ogType="website"
@@ -503,11 +530,9 @@ export default function ManufacturersPage() {
       {/* ── Trust bar */}
       <div className="w-full bg-[#1a1a2e] text-white text-[11px] py-1.5 px-4">
         <div className="max-w-[1400px] mx-auto flex items-center justify-between">
-          <span className="font-medium">Trusted by 500K+ Businesses Worldwide</span>
+          <span className="font-medium">Verified suppliers and factory-direct sourcing</span>
           <div className="hidden md:flex items-center gap-4 text-white/60">
             <span className="flex items-center gap-1"><Shield className="w-3 h-3 text-[#FF5A00]" /> Verified Suppliers</span>
-            <span>|</span>
-            <span className="flex items-center gap-1"><Globe className="w-3 h-3 text-[#FF5A00]" /> 180+ Countries</span>
             <span>|</span>
             <span className="flex items-center gap-1"><BadgeCheck className="w-3 h-3 text-[#FF5A00]" /> Trade Assurance</span>
           </div>
@@ -532,7 +557,7 @@ export default function ManufacturersPage() {
                 Verified <span className="text-[#FF5A00]">Suppliers</span> & Manufacturers
               </h1>
               <p className="text-white/70 text-[14px]">
-                Connect directly with certified factories, OEM/ODM producers, and verified exporters across 180+ countries
+                Connect directly with certified factories, OEM/ODM producers, and verified exporters
               </p>
             </div>
             <Link to="/auth?tab=register">
@@ -545,10 +570,7 @@ export default function ManufacturersPage() {
           {/* Stats */}
           <div className="flex flex-wrap items-center gap-4 md:gap-6 mt-4 md:mt-8">
             {[
-              { icon: Building2, value: totalCount || '500K+', label: 'Registered Suppliers' },
-              { icon: Globe, value: '180+', label: 'Countries' },
-              { icon: BadgeCheck, value: '75K+', label: 'Verified Suppliers' },
-              { icon: Star, value: '4.7', label: 'Avg. Rating' },
+              { icon: Building2, value: totalCount, label: 'Suppliers listed' },
             ].map(({ icon: Icon, value, label }) => (
               <div key={label} className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-lg bg-[#FF5A00]/15 border border-[#FF5A00]/30 flex items-center justify-center">
@@ -751,7 +773,7 @@ export default function ManufacturersPage() {
                   contacting={contactingId === co.id}
                   isFav={favouriteIds.includes(co.id)}
                   onToggleFav={toggleFavourite}
-                  onInviteRfq={(target) => setInviteTargetCo(target)}
+                  onInviteRfq={handleOpenInvite}
                 />
               ))}
             </div>
@@ -878,16 +900,25 @@ export default function ManufacturersPage() {
 
             <div className="space-y-1.5 pt-1">
               <label className="text-xs font-bold text-foreground">Select Active Requirement (RFQ) *</label>
-              <select
-                value={inviteRfqId}
-                onChange={(e) => setInviteRfqId(e.target.value)}
-                className="w-full bg-background border border-border rounded-xl px-3 py-2 text-xs font-medium focus:ring-1 focus:ring-primary"
-              >
-                <option value="BS-RFQ-1042">BS-RFQ-1042: Cotton Fabric – 100% Cotton (Knitted) (10,000 Metres)</option>
-                <option value="BS-RFQ-9981">BS-RFQ-9981: MS Pipe – 25mm (50,000 Pieces)</option>
-                <option value="BS-RFQ-8878">BS-RFQ-8878: Plastic Granules (HDPE) (10,000 kg)</option>
-                <option value="BS-RFQ-CUSTOM">Custom Active Buyer Requirement</option>
-              </select>
+              {inviteRfqs === null ? (
+                <p className="text-xs text-muted-foreground">Loading your requirements…</p>
+              ) : inviteRfqs.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  You have no active requirements yet. <Link to="/post-requirement" className="text-[#FF5A00] font-semibold hover:underline">Post an RFQ</Link> first, then invite suppliers to quote.
+                </p>
+              ) : (
+                <select
+                  value={inviteRfqId}
+                  onChange={(e) => setInviteRfqId(e.target.value)}
+                  className="w-full bg-background border border-border rounded-xl px-3 py-2 text-xs font-medium focus:ring-1 focus:ring-primary"
+                >
+                  {inviteRfqs.map((rfq) => (
+                    <option key={rfq.id} value={rfq.id}>
+                      {rfq.req_number ? `${rfq.req_number}: ` : ''}{rfq.title} ({rfq.quantity.toLocaleString()} {rfq.quantity_unit})
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
 
             <div className="space-y-1.5">
@@ -911,7 +942,7 @@ export default function ManufacturersPage() {
               </Button>
               <Button
                 onClick={handleSendInvite}
-                disabled={isSendingInvite}
+                disabled={isSendingInvite || !inviteRfqId}
                 className="flex-1 h-10 rounded-xl bg-[#FF5A00] hover:bg-[#e04e00] text-white font-bold text-xs shadow-sm"
               >
                 {isSendingInvite ? 'Sending Invitation...' : 'Send RFQ Invitation'}

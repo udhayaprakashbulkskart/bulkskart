@@ -685,7 +685,7 @@ export default function PricingPage() {
               <ul className="space-y-2 flex-1 mb-5 border-t border-border/80 pt-4">
                 {[
                   'Top Homepage & Marketplace 24H Spotlight Placement',
-                  'Instant Broadcast to 10,000+ Active Global Bulk Buyers',
+                  'Instant broadcast of your offer to buyers on BulkSkart',
                   'Direct Factory WhatsApp & Call Lead Priority',
                   'High Urgency 24-Hour Deal Banner & Countdown Badge',
                   'Zero Platform Commission on All Bulk Transactions',

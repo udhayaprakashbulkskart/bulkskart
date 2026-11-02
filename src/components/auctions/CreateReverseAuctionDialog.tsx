@@ -23,6 +23,7 @@ import {
 } from '@/lib/countryTaxConfig';
 import MultiImageUploader from '@/components/common/MultiImageUploader';
 import { PRE_CACHED_PIXABAY_IMAGES } from '@/lib/pixabay';
+import { BULKSKART_ICON_URL } from '@/constants/branding';
 
 interface CreateReverseAuctionDialogProps {
   trigger?: React.ReactNode;
@@ -297,11 +298,11 @@ export default function CreateReverseAuctionDialog({
           currency: 'INR',
           name: 'BulkSkart B2B Marketplace',
           description: `24-Hour Bulk Product Bidding Participation Fee (${bill.formattedTotal})`,
-          image: '/brand/bulkskart-icon.png',
+          image: BULKSKART_ICON_URL,
           prefill: {
             name: companyBillingName || (user?.user_metadata as any)?.full_name || '',
             email: user?.email || '',
-            contact: user?.phone || (user?.user_metadata as any)?.phone || '9876543210'
+            contact: user?.phone || (user?.user_metadata as any)?.phone || ''
           },
           notes: {
             service: '24-hour-auction-participation-fee',
@@ -398,14 +399,17 @@ export default function CreateReverseAuctionDialog({
           <form onSubmit={handleProceedToPayment} className="space-y-4 pt-3 pb-4">
             <div className="flex items-center justify-between pb-1">
               <span className="text-[11px] text-slate-400">Fill in your inventory lot specifications:</span>
-              <Button
-                type="button"
-                onClick={handleFillTestLot}
-                className="bg-[#FF5A00] hover:bg-[#e04e00] text-white text-[11px] font-bold h-7 px-3 rounded-lg shadow-[0_2px_0_#922f00] flex items-center gap-1 transition-all active:translate-y-0.5"
-              >
-                <Sparkles className="w-3 h-3" />
-                <span>⚡ Auto-Fill Test Lot</span>
-              </Button>
+              {/* Developer shortcut that fills the form with sample data. Never shown on the live site. */}
+              {import.meta.env.DEV && (
+                <Button
+                  type="button"
+                  onClick={handleFillTestLot}
+                  className="bg-[#FF5A00] hover:bg-[#e04e00] text-white text-[11px] font-bold h-7 px-3 rounded-lg shadow-[0_2px_0_#922f00] flex items-center gap-1 transition-all active:translate-y-0.5"
+                >
+                  <Sparkles className="w-3 h-3" />
+                  <span>⚡ Auto-Fill Test Lot</span>
+                </Button>
+              )}
             </div>
 
             {/* Title */}

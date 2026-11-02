@@ -74,8 +74,7 @@ const TIER_ICONS: Record<string, React.ReactNode> = {
 const TRUST_ITEMS = [
   { icon: Shield,    label: 'Secure Payments',   desc: 'Powered by Razorpay' },
   { icon: RefreshCw, label: 'Cancel Anytime',    desc: 'No lock-in contracts' },
-  { icon: Users,     label: '5,000+ Suppliers',  desc: 'Already on BulkSkart' },
-  { icon: Globe,     label: 'Global Reach',       desc: '80+ countries' },
+  { icon: Globe,     label: 'Global Reach',       desc: 'Buyers worldwide' },
 ];
 
 export default function SupplierSubscriptionPage() {
@@ -595,7 +594,7 @@ export default function SupplierSubscriptionPage() {
                       </div>
                       <h3 className="text-base font-bold text-foreground">24 Hours Sell Products</h3>
                       <p className="text-xs text-muted-foreground mt-1 mb-4">
-                        Flash 24-hour marketplace spotlight ribbon & push notifications broadcast to 10,000+ active global buyers.
+                        Flash 24-hour marketplace spotlight ribbon & push notifications broadcast to buyers on BulkSkart.
                       </p>
                       <ul className="space-y-2 mb-5 text-xs text-muted-foreground border-t border-border pt-3">
                         <li className="flex items-center gap-2">

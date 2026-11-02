@@ -49,54 +49,42 @@ const TAB_CONTEXT: Record<string, { heading: string; sub: string; stats: { label
     heading: 'Welcome Back to\nBulkSkart',
     sub: 'Sign in to manage your requirements, track quotes, and connect with verified global suppliers.',
     stats: [
-      { label: 'Registered Businesses', value: '1,20,000+' },
-      { label: 'Verified Manufacturers', value: '75,000+' },
-      { label: 'Active Requirements', value: '50,000+' },
-      { label: 'Countries Connected', value: '180+' },
+      { label: 'Requirements', value: 'Post & track' },
+      { label: 'Quotations', value: 'Compare offers' },
+      { label: 'Suppliers', value: 'Verified profiles' },
+      { label: 'Messages', value: 'Direct chat' },
     ],
     pills: ['Textiles', 'Machinery', 'Agriculture', 'Electronics', 'Pharma'],
   },
   buyer: {
     heading: 'Source Bulk Products\nFrom Verified Factories',
-    sub: 'Post your requirements once — receive quotes from 50,000+ manufacturers across India and 180 countries.',
+    sub: 'Post your requirements once and receive quotes from verified manufacturers.',
     stats: [
-      { label: 'Free RFQs / Month', value: 'Unlimited' },
-      { label: 'Verified Suppliers', value: '75,000+' },
-      { label: 'Avg. Quotes per RFQ', value: '10+' },
-      { label: 'Avg. Response Time', value: '<24 hrs' },
+      { label: 'RFQs', value: 'Free to post' },
+      { label: 'Quotes', value: 'Compare side by side' },
+      { label: 'Suppliers', value: 'Verified profiles' },
+      { label: 'Messages', value: 'Direct chat' },
     ],
     pills: ['Free Registration', 'Post RFQ Free', 'Compare Quotes', 'Direct Chat'],
   },
   supplier: {
-    heading: 'Reach 1,20,000+ Buyers\nGlobally',
+    heading: 'Reach Buyers\nGlobally',
     sub: 'Get your business verified, list products, and receive qualified bulk-order RFQs from international buyers every day.',
     stats: [
-      { label: 'Active Buyer RFQs', value: '50,000+' },
-      { label: 'Avg. Order Value', value: '₹5L+' },
-      { label: 'Export Countries', value: '180+' },
-      { label: 'New RFQs Daily', value: '500+' },
+      { label: 'Buyer RFQs', value: 'Browse open RFQs' },
+      { label: 'Verification', value: 'KYC badge' },
+      { label: 'Storefront', value: 'List products' },
+      { label: 'Quotes', value: 'Send & track' },
     ],
     pills: ['KYC Verified Badge', 'Priority Visibility', 'RFQ Matching', 'Analytics'],
   },
 };
 
-// Floating mock activity cards cycling on the panel
-const ACTIVITY_ITEMS = [
-  { icon: Package,    color: 'bg-[#FF5A00]',   text: 'New RFQ: 500 MT Basmati Rice — UAE Buyer' },
-  { icon: BadgeCheck, color: 'bg-green-500',  text: 'Sunrise Machinery verified — Pune' },
-  { icon: TrendingUp, color: 'bg-primary',    text: '12 quotes received on Cotton Fabric RFQ' },
-  { icon: Zap,        color: 'bg-amber-500',  text: 'New RFQ: 10,000 Pcs LED Bulb — Germany' },
-  { icon: Users,      color: 'bg-purple-500', text: '3 new suppliers matched to your RFQ' },
-  { icon: Package,    color: 'bg-teal-500',   text: 'New RFQ: 50 Tons Groundnut Oil — Singapore' },
-];
-
 // ── Left panel component ───────────────────────────────────────────────────────
 function AuthLeftPanel({ tab }: { tab: string }) {
   const ctx = TAB_CONTEXT[tab] ?? TAB_CONTEXT.login;
   const [slideIdx, setSlideIdx] = useState(0);
-  const [activityIdx, setActivityIdx] = useState(0);
   const [fadeSlide, setFadeSlide] = useState(true);
-  const [fadeActivity, setFadeActivity] = useState(true);
 
   // Cycle background image every 4s
   useEffect(() => {
@@ -110,21 +98,7 @@ function AuthLeftPanel({ tab }: { tab: string }) {
     return () => clearInterval(t);
   }, []);
 
-  // Cycle activity card every 3s
-  useEffect(() => {
-    const t = setInterval(() => {
-      setFadeActivity(false);
-      setTimeout(() => {
-        setActivityIdx(i => (i + 1) % ACTIVITY_ITEMS.length);
-        setFadeActivity(true);
-      }, 300);
-    }, 3000);
-    return () => clearInterval(t);
-  }, []);
-
   const slide = INDUSTRY_SLIDES[slideIdx];
-  const activity = ACTIVITY_ITEMS[activityIdx];
-  const ActivityIcon = activity.icon;
 
   return (
     <div className="hidden md:flex md:w-[52%] relative flex-col justify-between overflow-hidden bg-[#0d1117]">
@@ -193,23 +167,6 @@ function AuthLeftPanel({ tab }: { tab: string }) {
           ))}
         </div>
 
-        {/* Live activity ticker */}
-        <div
-          className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-xl px-3.5 py-2.5 backdrop-blur-sm transition-opacity duration-300"
-          style={{ opacity: fadeActivity ? 1 : 0 }}
-        >
-          <div className={`w-7 h-7 rounded-lg ${activity.color} flex items-center justify-center shrink-0`}>
-            <ActivityIcon className="w-3.5 h-3.5 text-white" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-[11px] font-medium text-white/80 truncate">{activity.text}</p>
-            <p className="text-[9px] text-white/35 mt-0.5">Just now · BulkSkart Live</p>
-          </div>
-          <span className="relative flex h-2 w-2 shrink-0">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
-          </span>
-        </div>
       </div>
 
       {/* ── Bottom: trust badge ── */}

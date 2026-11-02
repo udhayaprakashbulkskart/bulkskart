@@ -70,7 +70,7 @@ export default function TrustAndFinalCTASection() {
             eyebrow="Global B2B Wholesale"
             icon={<Sparkles className="h-3.5 w-3.5" />}
             title="Start Your Bulk Trading Journey Today"
-            subtitle="Join 50,000+ verified manufacturers and enterprise buyers securing high-volume orders with guaranteed escrow protection."
+            subtitle="Join verified manufacturers and enterprise buyers securing high-volume orders with escrow protection."
           />
         </div>
 

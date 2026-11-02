@@ -35,7 +35,7 @@ const faqs = [
   { q: 'Can I calculate a monthly installment for an order?', a: 'Yes. The order loan calculator on the homepage and at /loan-calculator estimates a monthly installment from the order value, down payment, rate, and tenure. It is a planning estimate, not a loan approval. Delivery on the order stays free.' },
   { q: 'How are manufacturers verified?', a: 'Suppliers submit GST certificates, IEC (Import Export Code), and company registration documents. Our team reviews and approves each application.' },
   { q: 'How many quotes will I receive?', a: 'Typically, buyers receive 5–20 quotes within 48–72 hours of posting their requirement, depending on the product category.' },
-  { q: 'Can I export to any country?', a: 'Yes. BulkSkart connects you with manufacturers who export to 180+ countries. Specify your destination country when posting a requirement.' },
+  { q: 'Can I export to any country?', a: 'Yes. BulkSkart connects you with manufacturers who export internationally. Specify your destination country when posting a requirement.' },
   { q: 'What is an IEC number?', a: 'IEC (Importer Exporter Code) is a 10-digit number issued by DGFT, India, mandatory for businesses doing import/export. Non-Indian businesses should upload equivalent documentation.' },
   { q: 'How do subscription plans work for suppliers?', a: 'Suppliers choose a plan that determines how many products they can list, how many RFQ leads they can access per month, and their visibility in search results.' },
 ];

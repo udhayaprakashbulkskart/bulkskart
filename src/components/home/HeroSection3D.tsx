@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Search, ArrowRight, Package, Users, Globe, Flame, FileText, Truck, Calculator } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { getMarketplaceCounts, type MarketplaceCounts } from '@/lib/api';
 
 interface HeroSection3DProps {
   onSearch?: (query: string, category: string) => void;
@@ -18,14 +19,20 @@ const POPULAR_CATEGORIES = [
   { name: 'Electrical', query: 'cables transformers switchgear' },
 ];
 
-const METRICS = [
-  { icon: Users, value: '50,000+', label: 'Verified manufacturers' },
-  { icon: Package, value: '1M+', label: 'Bulk products' },
-  { icon: Globe, value: '120+', label: 'Trade countries' },
-  { icon: Flame, value: '10,000+', label: 'Live RFQs & auctions' },
-];
 
 export default function HeroSection3D({ onSearch }: HeroSection3DProps) {
+  const [counts, setCounts] = useState<MarketplaceCounts | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    getMarketplaceCounts().then((result) => { if (!cancelled) setCounts(result); }).catch(() => { if (!cancelled) setCounts(null); });
+    return () => { cancelled = true; };
+  }, []);
+  const metrics = [
+    { icon: Users, value: counts?.verifiedSuppliers ?? null, label: 'Verified suppliers' },
+    { icon: Globe, value: counts?.supplierCountries ?? null, label: 'Supplier countries' },
+    { icon: Package, value: counts?.openRequirements ?? null, label: 'Open RFQs' },
+    { icon: Flame, value: counts?.liveAuctions ?? null, label: 'Live auctions' },
+  ];
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState<'products' | 'manufacturers' | 'rfqs'>('products');
@@ -157,13 +164,13 @@ export default function HeroSection3D({ onSearch }: HeroSection3DProps) {
           </div>
 
           <div className="mt-5 grid grid-cols-2 gap-3 border-t border-border pt-5">
-            {METRICS.map(({ icon: Icon, value, label }) => (
+            {metrics.map(({ icon: Icon, value, label }) => (
               <div key={label} className="flex items-center gap-3 rounded-xl border border-border bg-background p-3">
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
                   <Icon className="h-4 w-4" />
                 </div>
                 <div className="min-w-0">
-                  <div className="text-base font-black leading-tight text-foreground">{value}</div>
+                  <div className="text-base font-black leading-tight text-foreground">{value === null ? '—' : value.toLocaleString('en-IN')}</div>
                   <div className="truncate text-xs text-muted-foreground">{label}</div>
                 </div>
               </div>

@@ -19,6 +19,8 @@ import {
 import { AlertTriangle, CheckCircle, ShieldAlert, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/db/supabase';
+import { SUPPORT_EMAIL } from '@/lib/supportContact';
 
 interface ReportItemModalProps {
   open: boolean;
@@ -53,8 +55,12 @@ export default function ReportItemModal({
   const [submitted, setSubmitted] = useState(false);
   const [ticketId, setTicketId] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) {
+      toast.error('Please sign in to report a listing.');
+      return;
+    }
     if (!reason) {
       toast.error('Please select a violation reason.');
       return;
@@ -65,30 +71,34 @@ export default function ReportItemModal({
     }
 
     setLoading(true);
-    const newTicketId = `REP-${Math.floor(100000 + Math.random() * 900000)}`;
+    const reportId = crypto.randomUUID();
+    const reasonLabel = REPORT_REASONS.find((r) => r.value === reason)?.label ?? reason;
+    const description = [
+      `Reported ${targetType}: ${targetTitle} (id ${targetId})`,
+      `Contact email: ${contactEmail || user.email || 'not given'}`,
+      '',
+      notes.trim(),
+    ].join('\n');
 
-    setTimeout(() => {
-      // Save report in local storage for platform tracking
-      const existingReports = JSON.parse(localStorage.getItem('bs_reports') || '[]');
-      existingReports.push({
-        ticketId: newTicketId,
-        targetType,
-        targetId,
-        targetTitle,
-        reason,
-        notes: notes.trim(),
-        reporterEmail: contactEmail || user?.email || 'anonymous@bulkskart.com',
-        reporterUserId: user?.id || null,
-        createdAt: new Date().toISOString(),
-        status: 'pending_review',
-      });
-      localStorage.setItem('bs_reports', JSON.stringify(existingReports));
+    // Written to the reports table (row-level security keeps each report visible to its author and to admins).
+    // The reference shown below is the first part of that row's id, so it can be quoted to support.
+    const { error } = await supabase.from('reports').insert({
+      id: reportId,
+      reporter_id: user.id,
+      reported_product_id: targetType === 'product' ? targetId : null,
+      reported_company_id: targetType === 'company' ? targetId : null,
+      reason: reasonLabel,
+      description,
+    });
+    setLoading(false);
 
-      setLoading(false);
-      setSubmitted(true);
-      setTicketId(newTicketId);
-      toast.success(`Report submitted successfully (Ref #${newTicketId}).`);
-    }, 600);
+    if (error) {
+      toast.error(`We could not record your report. Please email ${SUPPORT_EMAIL} instead.`);
+      return;
+    }
+    setSubmitted(true);
+    setTicketId(reportId.slice(0, 8).toUpperCase());
+    toast.success('Report recorded.');
   };
 
   const handleClose = () => {
@@ -128,7 +138,7 @@ export default function ReportItemModal({
             <div>
               <h3 className="text-base font-bold text-white mb-1">Report Received</h3>
               <p className="text-xs text-slate-300 max-w-sm mx-auto">
-                Thank you for helping keep BulkSkart a safe B2B trade marketplace. Our compliance team will review your report within 24 hours.
+                Thank you for helping keep BulkSkart a safe B2B trade marketplace. Your report has been recorded and will be reviewed by the BulkSkart team.
               </p>
               <div className="mt-3 inline-block px-3 py-1.5 rounded-lg bg-slate-800/80 border border-slate-700 text-xs text-slate-300 font-mono">
                 Tracking Ref: <span className="text-[#FF5A1F] font-bold">{ticketId}</span>
@@ -149,6 +159,11 @@ export default function ReportItemModal({
               <span className="text-slate-400 block mb-0.5">Target Entity:</span>
               <p className="font-semibold text-white truncate">{targetTitle}</p>
             </div>
+            {!user && (
+              <p className="text-xs text-amber-300">
+                You need to <a href="/auth" className="underline font-semibold">sign in</a> before you can submit a report.
+              </p>
+            )}
 
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-slate-300">
