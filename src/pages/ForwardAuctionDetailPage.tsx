@@ -151,7 +151,7 @@ export default function ForwardAuctionDetailPage() {
           if (companyIds.length > 0) {
             const { data: companyRows } = await supabase
               .from('companies')
-              .select('id, company_name, business_type, city, state, country, verification_status, created_at, rating_avg, contact_phone, annual_turnover')
+              .select('id, company_name, business_type, city, state, country, verification_status, created_at, rating_avg, annual_turnover')
               .in('id', companyIds);
             companyMap = Object.fromEntries((companyRows ?? []).map((c: any) => [c.id, c as BidderCompany]));
             if (isMounted) setBidderCompanies(companyMap);
@@ -182,7 +182,7 @@ export default function ForwardAuctionDetailPage() {
               quantity: Number(b.quantity) || data.total_quantity,
               timestamp: new Date(b.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
               status: idx === 0 ? 'winning' : 'outbid',
-              contact_phone: companyMap[b.bidder_company_id]?.contact_phone || undefined
+              contact_phone: undefined
             })));
           } else if (isMounted) {
             setBidHistory([]);
