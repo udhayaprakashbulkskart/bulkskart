@@ -1,0 +1,36 @@
+---
+description: How to redeploy BulkSkart production on the new AWS VM
+alwaysApply: true
+---
+
+# BulkSkart production deploy
+
+When the user asks to deploy, redeploy, ship, or push to production:
+
+1. Prefer the SSM deploy script (no interactive SSH required):
+
+```bash
+bash scripts/deploy-prod-ssm.sh
+```
+
+2. Production target (do **not** use old Aura co-host IPs/instance IDs):
+
+- AWS account: `446333449297`
+- Region: `ap-south-1`
+- Instance: `i-0984845bd6a4b06b1` (`bulkskart-prod`)
+- Elastic IP: `13.127.26.125`
+- S3 deploy bucket: `bulkskart-deploy-prod-446333449297`
+- Site: `https://www.bulkskart.com`
+- Stack path on VM: `/opt/bulkskart/stack`
+- Env file: `deploy/bulkskart/prod.env`
+
+3. SSH fallback (migrations, logs, one-off fixes):
+
+```bash
+ssh bulkskart-prod '…'
+# Host alias → ubuntu@13.127.26.125 with ~/.ssh/aura-prod-ed25519
+```
+
+4. After frontend deploy, confirm `https://www.bulkskart.com/` returns HTTP 200.
+
+5. DB / edge-function changes: apply SQL via `ssh bulkskart-prod` + `docker exec -i supabase-db psql …`, and rsync functions into `/opt/bulkskart/stack/volumes/functions/` (keep `main/` and `hello/`).

@@ -1,0 +1,54 @@
+# Standalone BulkSkart production (dedicated EC2 — no Aura shared network)
+name: bulkskart
+
+services:
+  api-gw:
+    ports: !reset []
+
+  db:
+    volumes:
+      - /data/bulkskart/db:/var/lib/postgresql/data:Z
+
+  storage:
+    volumes:
+      - /data/bulkskart/storage:/var/lib/storage:Z
+
+  web:
+    container_name: bulkskart-web
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    volumes:
+      - ./frontend/dist:/usr/share/nginx/html:ro
+      - ./frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - api-gw
+
+  caddy:
+    container_name: supabase-caddy
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    depends_on:
+      api-gw:
+        condition: service_healthy
+      web:
+        condition: service_started
+    environment:
+      PROXY_DOMAIN: ${PROXY_DOMAIN}
+    volumes:
+      - ./volumes/proxy/caddy:/etc/caddy
+      - caddy_data:/data
+      - caddy_config:/config
+
+  functions:
+    environment:
+      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-}
+      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-}
+      PIXABAY_API_KEY: ${PIXABAY_API_KEY:-}
+
+volumes:
+  caddy_data:
+  caddy_config:

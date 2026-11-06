@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# One-command production redeploy for BulkSkart (AI / CLI).
+# Usage: ./scripts/deploy
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+exec bash "$ROOT/scripts/deploy-prod-ssm.sh" "$@"

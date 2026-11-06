@@ -1,9 +1,9 @@
 name: Deploy production
 
 on:
+  workflow_dispatch:
   push:
     branches: [master, main]
-  workflow_dispatch:
 
 concurrency:
   group: production-deploy
@@ -28,6 +28,17 @@ jobs:
         with:
           version: 9
 
+      - name: Require AWS secrets
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$AWS_SECRET_ACCESS_KEY" ]; then
+            echo "Missing AWS_ACCESS_KEY_ID or AWS_SECRET_ACCESS_KEY on this repository."
+            echo "Add both as Actions secrets for the bulkskart-ai-deploy IAM user."
+            exit 1
+          fi
+
       - name: Configure AWS
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -37,11 +48,10 @@ jobs:
 
       - name: Deploy via S3 + SSM
         env:
-          AWS_PROFILE: ''
-          INSTANCE_ID: i-05439223085603d42
-          DEPLOY_BUCKET: bulkskart-deploy-prod
+          AWS_REGION: ap-south-1
+          INSTANCE_ID: i-0984845bd6a4b06b1
+          DEPLOY_BUCKET: bulkskart-deploy-prod-446333449297
+          VITE_SUPABASE_URL: https://www.bulkskart.com
         run: |
-          chmod +x scripts/deploy-prod-ssm.sh
-          # Script prefers AWS_PROFILE; clear it so default env creds from the action are used.
-          unset AWS_PROFILE || true
+          chmod +x scripts/deploy-prod-ssm.sh scripts/deploy
           bash scripts/deploy-prod-ssm.sh
